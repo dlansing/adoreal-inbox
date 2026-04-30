@@ -577,6 +577,34 @@ html,body{height:100%;min-height:100vh;font-family:'Proxima Nova','Nunito Sans',
    triggered by body classes for navigation between them
 ════════════════════════════════════════ */
 @media (max-width: 767px){
+  /* iOS zoom prevention — Mobile Safari auto-zooms when an input/textarea has a font-size
+     smaller than 16px on focus. Forcing 16px on all editable fields stops that behavior. */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="search"],
+  input[type="url"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  input[type="number"],
+  input[type="password"],
+  input:not([type]),
+  textarea,
+  select,
+  .dv-input,
+  .compose-ta,
+  .compose-email-input,
+  .email-reply-input,
+  .email-reply-body,
+  .modal-input,
+  .modal-textarea,
+  .task-input,
+  .task-textarea,
+  .search-wrap input,
+  .aos-search input{
+    font-size:16px !important;
+  }
   /* Show mobile-only buttons */
   .mobile-back-btn{display:inline-flex}
   .mobile-info-btn{display:inline-flex}
