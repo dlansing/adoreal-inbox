@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  adoreal. — Lead Management System (LMS) prototype  ·  v0.5  (2026-05-15)
+
+  v0.5 — cross-prototype critical-tasks + Open-conversation deep links.
+
+    1. Tasks created via inbox.html's "Create task" modal (v0.42 renamed
+       its severity label "High priority" → "Critical") now persist to
+       localStorage under `adoreal_critical_tasks`. lms.html reads from
+       the same key and renders user-created tasks in the Overview
+       Critical-tasks rail above the patient-derived ones. Tasks with
+       the Critical checkbox ticked surface here; non-critical tasks
+       are stored but not surfaced (the Tasks view will pick them up
+       in a later iteration).
+
+    2. Open-conversation deep link from lms.html → inbox.html:
+         • Each patient critical-task card: small "Open conversation →"
+           link in the card footer (event.stopPropagation so it doesn't
+           trigger the card's drawer-opening click).
+         • Each user-created task card: same link, deep-linked to the
+           patient that task is for.
+         • The person drawer's quick-actions row: "Open conversation →"
+           sits alongside Call / WhatsApp / Email / Book. Href is
+           rewritten per-drawer-open so the patient id stays in sync.
+       Inbox-side receiver: inbox.html reads `?patient=<id>` from
+       URL.searchParams and replaces the default `selectPatient(0)`
+       call with the matched patient. Falls back gracefully if the
+       param is missing, malformed, or matches no one in the seed.
+
+    3. Three more lms→inbox handoffs proposed but NOT wired in v0.5
+       (call out in FEATURE_MAP.md):
+         • Channel-aware Call/WhatsApp/Email buttons in the drawer
+           should deep-link to inbox.html with both patient + channel
+           hint (`inbox.html?patient=N&chan=wa`). Inbox already has a
+           per-patient defaultChan that picks the right tab — wire it
+           through.
+         • Each task row in the Tasks view → "Open conversation" inline
+           link.
+         • Pipeline lane card → context-menu with "Open in inbox" as
+           one of its options.
+       Each is small CSS+wiring; they were left for v0.6 to keep this
+       version focused on the create-task round-trip.
+
+  Earlier version history kept below for traceability:
+  ──────────────────────────────────────────────────────────────────────
+  v0.4 — what changed since v0.3 (in order they happened):
+
+    1. Cross-linked with inbox.html (the vision; was v0.41 of the
+       Unified Inbox iteration). Both files share David's canonical
+       aos-topbar verbatim — "Contact Center" in inbox routes to lms,
+       "Inbox" in lms routes to inbox.
+    2. Inbox unread-count badge appears only on inbox.html — non-inbox
+       surfaces stay calm.
+    3. Mobile-first rewrite. Default styles target the phone viewport;
+       @media (min-width:768px) adds the desktop layout. Rail becomes a
+       fixed bottom tab bar on mobile, vertical 100px column ≥768px.
+    4. Rail trimmed: Inbox + Contacts dropped (Inbox duplicated top-nav
+       Inbox; Contacts was noise). Then Analytics added when
+       Performance moved out of the persistent banner. Final four-then-
+       five: Overview · Tasks · Pipeline · Engine · Analytics.
+    5. Seven-stage taxonomy replaces the v0.3 eight-stage model. Palette
+       lifted verbatim from inbox.html (v0.41 sp-* classes): Discover
+       yellow → Consult teal → Decide lavender → Pre-op orange →
+       Surgery red-pink → Recover pink → Long-term sage. No "cold"
+       terminal stage — journey is positive end-to-end.
+    6. Patients swapped to the nine canonical names from inbox.html so
+       clicking a person in either prototype tells the same story.
+    7. Performance last 7 days moved off the top. It used to be a
+       persistent five-card banner above every view; now it lives on
+       the Analytics tab alone. The TOP of Overview is the work-
+       driving Today strip (urgent · tasks due · new today w/ system-
+       vs-human split · complications) — every count clickable to the
+       view where you can act on it.
+    8. Pain-points stay as design context (PAIN_POINTS const +
+       FEATURE_MAP.md) but are NOT rendered on Overview — Overview is
+       for getting work done, not explaining what was fixed.
+    9. "Boxly" scrubbed from every user-facing string. Replaced with
+       neutral framing (e.g. "the engine handles enquiry…" not
+       "Boxly required a human at every step").
+
+  Test contract this version must preserve (see /Users/davidclansing/
+  Downloads/adoreal_lms_tests/):
+    • Today strip is the first child of #view-overview (smell-test
+      guard against re-promoting vanity metrics to the top).
+    • Performance kpi-row lives in #view-analytics, hidden by default.
+    • #pain-grid does NOT exist in the rendered DOM.
+    • Rail has exactly 5 .rail-item buttons; Overview active by default.
+    • At 390-wide viewport, .rail sits at the bottom edge as a fixed
+      tab bar.
+    • Stage palette swatch for Discover === rgb(254,248,231).
+    • showVersion() click on the gear surfaces "v0.4" in #version-toast-num.
+
+  Earlier version-history kept for traceability:
+  ──────────────────────────────────────────────────────────────────────
+  v0.3 — pixel-pass against Figma.
+  ─────────────────────────────────────────────────────────────────────────────
+  Source of truth: Figma file `z2DZzndHRpA5lEG6gHGGdD` (CRM) node `458:18573`.
+  Pulled via Figma MCP server (mcp__82f6cd75-b638-47df-9430-f87c7974f12a__*).
+  See `~/.claude/projects/.../memory/project_adoreal_design_system.md` for
+  the canonical token table (cross-verified against David's `mvp.html`).
+
+  Why v0.3 exists — the misses v0.2 made:
+    1. v0.2 SCREAMED. CAPS everywhere ("URGENT", "SYSTEM", "HUMAN", section
+       titles in uppercase). Adoreal's brand voice "calmly explains" — it
+       doesn't shout. Every label, tag, and status pill is now sentence case.
+    2. Wrong card silhouette. v0.2 cards used 8–12px radii and heavy borders.
+       Figma cards use **4px radius** and a near-transparent
+       `rgba(0,0,0,0.23)` border — a much quieter silhouette.
+    3. Wrong KPI card treatment. v0.2 had a horizontal strip of borderless
+       white cards with delta-arrow noise. Figma uses 5 equal **light grey
+       (#F6F6F6)** cards with no borders and a minimal stat-+-label layout.
+    4. Missing the vertical left rail. Figma has a 100px icon-rail on the
+       left (Overview · Tasks · Inbox · Contacts · Pipeline · Analytics)
+       with count badges to the right of each label. v0.2 only had the
+       top bar nav. Adoreal CEAs use both — the top nav is the product
+       breadcrumb; the left rail is the within-product navigation.
+    5. Wrong wordmark size. Figma uses DM Serif Display **28px**, not 24px.
+    6. Wrong nav active treatment. v0.2 used a brown text + a count badge.
+       Figma uses brown semibold text + no badge (counts go in the left
+       rail). Top-bar Inbox unread count was misleading.
+    7. Primary button over-treated. v0.2 had a heavy black-on-pink "Add
+       manually" button with a "+ icon." Figma uses a single black pill
+       (`#202020`, 40px, sentence case "Add contact", no icon).
+    8. Tags wrong. v0.2 used pill tags ("Hot lead" → "URGENT" colour
+       slabs). Figma tags are **4px-radius rectangles**, sentence case,
+       single subtle border, 14px Regular.
+
+  Visual contract (the things to NOT re-break in future iterations):
+    • Every user-visible string is sentence case unless it is a proper
+      noun, code, or 1-character status marker.
+    • Body font is Proxima Nova → Mulish fallback. 14/16px Regular.
+    • Wordmark "adoreal." is DM Serif Display 28px, line-height 1.
+    • Active top-nav item: nude-brown #965E47, font-weight 600 (semibold).
+    • Active left-rail item: peach #F4E7E3 fill + 2px black left border.
+    • Page background is plain white (#FFFFFF) inside the rail/topbar shell.
+      The app shell sits on the warm off-white background (#FEF7F5) only
+      visible as the 2px shell border.
+    • Cards use radius 4px unless explicitly stated. Buttons are pills (20px).
+
+  Functional changes vs v0.2:
+    • Overview is now the default view (was Pipeline). It's a Figma-
+      matched dashboard: KPI strip + Critical tasks + Unread messages.
+    • Left rail nav switches the view: Overview / Tasks / Pipeline /
+      Engine. (Inbox + Contacts + Analytics are stubs that show a small
+      "this view lives in [other prototype/v0.X+1]" notice — they're in
+      the rail because the design includes them, not because they're
+      built yet.)
+    • Tasks view tightened: same Today/Week/Overdue grouping as v0.2 but
+      with the new visual language.
+    • Engine view kept but visually quieted: no pulsing dot, no colored
+      banner, no caps in the actor / status pills.
+    • Drawer: same four panes (Overview / Touch-points / Suggested action
+      / Timeline), all repainted.
+
+  Test instrumentation (new):
+    • `data-testid="…"` attributes on every interactive node so Playwright
+      doesn't bind to incidental selectors.
+    • Window-level `window.__lms = { people, STAGES, … }` exposed for unit
+      tests to call pure functions directly via `page.evaluate()`.
+
+  Tests live at: /Users/davidclansing/Downloads/adoreal_lms_tests/
+    Run: `cd … && npm install && npx playwright test`
+
+  Three version-string locations — bump all three each iteration:
+    1. Header comment block (this section).
+    2. meta tag: adoreal-prototype-version content
+    3. <title> at the end with matching · v0.N
+  (Examples kept abstract so the version-gear test's regex doesn't pick
+  them up as the real meta-tag content.)
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="adoreal-prototype-version" content="0.5"/>
+<title>adoreal. — Lead Management System · v0.5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Mulish:wght@400;500;600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Design tokens — sourced from Figma file z2DZzndHRpA5lEG6gHGGdD ──
+   See memory/project_adoreal_design_system.md for the canonical table.
+   ─────────────────────────────────────────────────────────────────── */
+:root{
+  /* Brand */
+  --black:#342F2C; --white:#FFFFFF; --bg:#FEF7F5;
+  --nude:#965E47; --nude-pink:#E1A991; --brown:#B1785F;
+  --pink-medium:#F4E7E3;
+
+  /* Peach scale (David's MVP, compatible with Figma Skeleton) */
+  --p2:#F4E7E3; --p3:#EFDCD7; --p4:#E7CDC6; --p5:#DFBBB1;
+
+  /* Grayscale */
+  --g1:#FFFFFF; --g2:#F9F9F9; --g3:#EBEAEA; --g4:#D3D3D3;
+  --g5:#BDBDBD; --g6:#787878; --g7:#6D635D; --g8:#342F2C;
+
+  /* Page chrome */
+  --shell-bg:#FEF7F5;
+  --kpi-bg:#F6F6F6;
+  --text-primary:#202020;     /* slightly cooler than --black; Figma uses #202020 for headings */
+  --divider:#EBEAEA;
+
+  /* Signal (with soft = 50% alpha) */
+  --red:#CB4137; --red-soft:rgba(203,65,55,.5);
+  --yellow:#F4C569; --yellow-soft:rgba(244,197,105,.5);
+  --green:#7AC558; --green-soft:rgba(122,197,88,.5);
+
+  /* Radii */
+  --r4:4px;        /* cards, tags */
+  --r8:8px;        /* panel/popover */
+  --r20:20px;      /* pill / component radius */
+
+  /* Spacing tokens (Figma) */
+  --sp-0_5:8px; --sp-1:16px; --sp-2:32px; --sp-4:64px; --sp-same:20px;
+}
+
+html,body{
+  height:100%;
+  font-family:'Proxima Nova','Mulish','Nunito Sans','Helvetica Neue',Arial,sans-serif;
+  background:var(--shell-bg);
+  color:var(--black);
+  font-size:14px;
+  line-height:1.4;
+  overflow:hidden;
+}
+
+/* ══════════════ TOP BAR — sourced verbatim from mvp.html so inbox + lms
+   share one canonical top bar. Don't redesign here; iterate it in mvp.html
+   and copy back. The aos-nav-item[href] rule is the only addition — it
+   turns the Patients/Inbox nav items into clickable anchors that route
+   between the two prototypes. ══════════════ */
+.aos-topbar{display:flex;align-items:center;gap:32px;padding:0 28px;height:64px;background:var(--white);border-bottom:1px solid var(--p4);flex-shrink:0;position:relative;z-index:50;transition:padding .25s ease,height .25s ease,gap .25s ease}
+.aos-wordmark{font-family:'DM Serif Display',Georgia,serif;font-size:24px;color:var(--black);letter-spacing:-.3px;line-height:1;flex-shrink:0;transition:font-size .25s ease}
+.aos-search{flex:0 0 320px;max-width:320px;position:relative;display:flex;align-items:center}
+.aos-search-icon{position:absolute;left:14px;color:var(--g6);pointer-events:none;display:flex}
+.aos-search input{width:100%;height:38px;border:1.5px solid var(--p4);border-radius:var(--r20);background:var(--white);padding:0 14px 0 38px;font-size:13px;color:var(--black);font-family:inherit;outline:none;transition:border-color .15s}
+.aos-search input::placeholder{color:var(--g6)}
+.aos-nav{display:flex;align-items:center;gap:28px;flex:1;height:100%}
+.aos-nav-item{font-size:14px;color:var(--g7);font-weight:300;cursor:default;padding:6px 0;transition:color .15s;letter-spacing:.1px;display:inline-flex;align-items:center;gap:6px;line-height:1;height:100%;text-decoration:none}
+.aos-nav-item[href]{cursor:pointer}
+@media (hover: hover) { .aos-nav-item:hover{color:var(--black)} }
+.aos-nav-item.active{color:var(--nude);font-weight:400}
+.aos-nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--nude);color:var(--white);font-size:10px;font-weight:600;line-height:1;letter-spacing:0;font-family:inherit;box-sizing:border-box;flex-shrink:0}
+.aos-nav-badge:empty,.aos-nav-badge.zero{display:none}
+.aos-right{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.aos-icon-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--p4);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--g7);transition:all .15s;font-family:inherit}
+@media (hover: hover) { .aos-icon-btn:hover{background:var(--bg);color:var(--black)} }
+.version-toast-anchor{position:relative;display:flex;align-items:center}
+.version-toast{position:absolute;top:calc(100% + 8px);right:0;background:var(--white);border:1px solid var(--p4);border-radius:12px;padding:8px 14px;box-shadow:0 6px 20px rgba(52,47,44,.12);display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap;opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .15s,transform .15s;z-index:1000}
+.version-toast.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+.version-toast-label{color:var(--g7);font-weight:500}
+.version-toast-num{color:var(--brown);font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width: 1024px) { .version-toast{display:none} }
+.aos-user{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px 4px 4px;border-radius:var(--r20);transition:background .15s}
+@media (hover: hover) { .aos-user:hover{background:var(--bg)} }
+.aos-user-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--brown),var(--nude));color:var(--white);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.aos-user-name{font-size:13px;color:var(--black);font-weight:500}
+.aos-user-caret{color:var(--g7);display:flex}
+@media (max-width:1024px) {
+  .aos-topbar{padding:0 14px;gap:12px;height:56px;transition:padding .25s ease,height .25s ease}
+  .aos-wordmark{font-size:22px}
+  .aos-search,.aos-nav{display:none}
+  .aos-user-name{display:none}
+  .aos-right{margin-left:auto}
+}
+
+/* ══════════════ SHELL ══════════════
+   Mobile-first: column with rail pinned to bottom. ≥768px: row layout with
+   left rail. The 2px gap shows the warm-grey gutter on desktop only. */
+.shell{
+  display:flex; flex-direction:column;
+  width:100%;
+  height:calc(100vh - 56px);   /* mobile top bar = 56px */
+  background:#E6E6E6;
+  min-height:0;
+}
+@media (min-width:768px){
+  .shell{
+    flex-direction:row;
+    gap:2px;
+    height:calc(100vh - 64px); /* desktop top bar = 64px */
+  }
+}
+
+/* ── RAIL — mobile bottom tab bar; desktop left rail
+   Mobile: fixed bottom tab bar, 4 equal columns, no count badges (declutter).
+   Desktop: vertical column, 100px wide, count badges visible.
+   The same .rail-item button renders both — only the parent .rail flips. */
+.rail{
+  position:fixed; bottom:0; left:0; right:0;
+  width:100%; height:64px;
+  background:var(--white);
+  border-top:1px solid var(--p4);
+  display:flex; flex-direction:row;
+  z-index:30;
+}
+.rail-item{
+  position:relative;
+  flex:1 1 0; min-width:0;
+  height:64px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; padding:6px 4px;
+  background:transparent; border:0; cursor:pointer;
+  font-family:inherit; transition:background .15s;
+}
+.rail-item:hover{ background:var(--bg); }
+.rail-item.active{ background:var(--pink-medium); }
+.rail-item.active::before{
+  content:""; position:absolute; top:0; left:0; right:0; height:2px;
+  background:var(--black);
+}
+.rail-item-icon{
+  width:22px; height:22px; color:var(--g7);
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.rail-item.active .rail-item-icon{ color:var(--black); }
+.rail-item-label{ font-size:11px; line-height:1; color:var(--g7); }
+.rail-item.active .rail-item-label{ color:var(--black); font-weight:600; }
+.rail-item-count{ display:none; }  /* mobile: hide counts to keep tabs calm */
+
+@media (min-width:768px){
+  .rail{
+    position:static;
+    width:100px; height:auto;
+    flex-direction:column;
+    flex-shrink:0;
+    border-top:0;
+    overflow-y:auto;
+  }
+  .rail-item{
+    flex:0 0 auto;
+    width:100%; height:78px;
+    gap:4px; padding:8px;
+  }
+  .rail-item.active{ border-left:2px solid var(--black); padding-left:6px; }
+  .rail-item.active::before{ display:none; }
+  .rail-item-icon{ width:24px; height:24px; }
+  .rail-item-label{ font-size:14px; line-height:20px; }
+  .rail-item-count{
+    display:block;
+    position:absolute; top:14px; right:18px;
+    font-size:14px; line-height:20px; color:var(--g7);
+  }
+}
+
+/* ── MAIN COLUMN — mobile compact, desktop comfortable
+   Mobile bottom padding clears the 64px fixed tab bar plus breathing room. */
+.main{
+  flex:1; min-width:0;
+  background:var(--white);
+  padding:16px 16px calc(64px + 24px);
+  overflow-y:auto;
+  display:flex; flex-direction:column; gap:18px;
+}
+@media (min-width:768px){
+  .main{ padding:20px 32px; gap:24px; }
+}
+
+/* ── PAGE TITLE ROW — mobile stacks, hides "Assigned to:" label
+   Buttons shrink to 36px on mobile so the row never wraps awkwardly. */
+.page-head{
+  display:flex; flex-direction:column; align-items:flex-start; gap:12px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--g3);
+}
+/* Page title matches inbox .cv-name (the thread header) — 14/600 on
+   mobile, 16/600 on desktop. Was 18 — that read as a different scale
+   from the rest of the file. */
+.page-title{
+  font-size:16px; font-weight:600; color:var(--text-primary);
+  line-height:1.2;
+}
+.page-head-right{
+  display:flex; align-items:center; gap:10px;
+  width:100%;
+}
+.assigned-label{ display:none; }                                /* hidden on mobile */
+.selector{
+  flex:1; min-width:0;
+  display:inline-flex; align-items:center; justify-content:space-between; gap:8px;
+  height:36px; padding:4px 14px;
+  background:var(--white); border:1px solid #D9D9D9;
+  border-radius:var(--r20);
+  font-size:14px; color:var(--g7); cursor:pointer;
+  font-family:inherit;
+}
+.selector svg{ color:var(--g7); flex-shrink:0; }
+.btn-primary{
+  display:inline-flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+  height:36px; padding:0 16px;
+  background:#202020; color:var(--white); border:0;
+  border-radius:var(--r20);
+  font-family:inherit; font-size:14px; line-height:1;
+  cursor:pointer; transition:background .15s;
+  white-space:nowrap;
+}
+.btn-primary:hover{ background:#000; }
+@media (min-width:768px){
+  .page-head{ flex-direction:row; align-items:center; justify-content:space-between; padding-bottom:8px; gap:0; }
+  .page-title{ font-size:16px; }
+  .page-head-right{ width:auto; gap:16px; }
+  .assigned-label{ display:inline; font-size:16px; color:var(--g7); line-height:22px; }
+  .selector{ flex:0 0 auto; height:40px; padding:4px 20px; font-size:16px; }
+  .btn-primary{ height:40px; padding:0 20px; font-size:16px; line-height:22px; }
+}
+
+/* ══════════════ KPI STRIP ══════════════ */
+.kpi-row{ display:flex; flex-direction:column; gap:10px; }
+.kpi-row-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 8px; height:32px;
+}
+/* Section titles — 14/600 matches inbox .cv-name; the original 16 was
+   inherited from the Figma Overview frame but felt heavier than the
+   surrounding type on the same page. */
+.kpi-row-title{ font-size:14px; font-weight:600; color:var(--text-primary); line-height:1.2; }
+.kpi-row-link{ font-size:12px; color:var(--g7); text-decoration:none; cursor:pointer; font-weight:500; }
+.kpi-row-link:hover{ color:var(--nude); text-decoration:underline; }
+
+/* ── TODAY STRIP — the top of Overview
+   Four work-driving counts. Each stat is a button: click routes to the
+   view where you can act on that number (urgent + tasks → Tasks view;
+   new → Pipeline; complications → Tasks). The "Performance last 7 days"
+   five-card vanity strip lives on the Analytics view now. */
+.today-strip{
+  display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;
+}
+@media (min-width:768px){
+  .today-strip{ grid-template-columns:repeat(4, 1fr); }
+}
+.today-stat{
+  display:flex; flex-direction:column; gap:2px;
+  padding:12px 14px;
+  background:var(--white); border:1px solid rgba(0,0,0,.08);
+  border-radius:var(--r4);
+  font-family:inherit; text-align:left;
+  cursor:pointer; transition:all .12s;
+}
+.today-stat:hover{ background:var(--bg); border-color:var(--p4); }
+/* Stat sizes pulled back to the inbox vocabulary — big-but-quiet rather
+   than screaming. 20px is the largest body-rhythm size in the file. */
+.today-num{ font-size:20px; font-weight:600; color:var(--text-primary); line-height:1.1; font-variant-numeric:tabular-nums; }
+.today-lbl{ font-size:12px; color:var(--text-primary); font-weight:500; }
+.today-meta{ font-size:11px; color:var(--g6); margin-top:2px; line-height:1.3; }
+
+/* KPI strip — mobile: 2-column grid (5 cards across is unreadable on
+   a phone). Desktop: 5-column flex. */
+.kpi-strip{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+.kpi-card{
+  background:var(--kpi-bg);
+  border-radius:var(--r4);
+  padding:10px;
+  display:flex; flex-direction:column; gap:3px;
+}
+@media (min-width:768px){
+  .kpi-strip{ display:flex; gap:10px; }
+  .kpi-card{ flex:1; min-width:0; padding:8px; }
+}
+/* Analytics-view KPI card. Numbers stay in the body rhythm (14/600)
+   per Sofia's Figma — they're reference figures, not heroes. */
+.kpi-stat{
+  display:flex; align-items:center; gap:3px;
+  font-size:14px; font-weight:600; color:var(--text-primary); line-height:1.2;
+}
+.kpi-label{
+  font-size:12px; color:var(--text-primary); opacity:.8; line-height:1.3;
+}
+.kpi-delta{
+  font-size:11px; color:var(--g6); opacity:.8; line-height:1.3;
+}
+
+/* ══════════════ CRITICAL TASKS — mobile: stacked full-width cards
+   Desktop: 300px row, wraps. */
+.cards-row{ display:flex; flex-direction:column; gap:12px; }
+.cust-card{
+  width:100%;
+  background:linear-gradient(to bottom, #FFF6F6, var(--white));
+  border:1px solid rgba(0,0,0,.23);
+  border-radius:var(--r4);
+  padding:22px 16px;
+  display:flex; flex-direction:column; gap:8px;
+}
+@media (min-width:768px){
+  .cards-row{ flex-direction:row; flex-wrap:wrap; }
+  .cust-card{ width:300px; }
+}
+.cust-card.calm{ background:var(--white); }
+
+/* Open-conversation deep link — appears on critical-task cards + the
+   person drawer. Clicking it lands the user on inbox.html with the
+   matching patient selected. Intentionally subtle so it doesn't compete
+   with the primary card click that opens the LMS detail drawer. */
+.open-thread-link{
+  display:inline-flex; align-items:center; gap:4px;
+  margin-top:4px; padding:4px 0;
+  font-size:11px; font-weight:600; color:var(--nude);
+  letter-spacing:.2px;
+  text-decoration:none; cursor:pointer;
+  align-self:flex-start;
+}
+.open-thread-link:hover{ color:var(--brown); }
+.open-thread-link svg{ flex-shrink:0; }
+
+/* ══════════════ SEVEN-STAGE LEGEND + TWELVE PAIN-POINTS
+   Mobile: legend = 2-up grid, pain points = single column.
+   iPad+:  legend = 7-up row.
+   Desktop ≥1200: pain points = 3-up grid.
+   The pill itself uses the same bg / fg as the inbox v0.41 .sp-pill
+   classes, so a Discover/Recover/etc. badge here reads identically. */
+.stage-legend{ display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+@media (min-width:768px){ .stage-legend{ grid-template-columns:repeat(7, 1fr); } }
+.stage-row{
+  display:flex; flex-direction:column; gap:6px;
+  padding:12px; background:var(--white);
+  border:1px solid rgba(0,0,0,.08); border-radius:var(--r4);
+}
+/* Stage pill metrics match inbox .sp-pill exactly: 20h / 0-8 / 11/500 / r4. */
+.stage-pill{
+  display:inline-flex; align-items:center;
+  height:20px; padding:0 8px;
+  border-radius:var(--r4);
+  font-size:11px; font-weight:500; line-height:1;
+  width:fit-content;
+}
+.stage-meaning{ font-size:11px; line-height:1.4; color:var(--g7); }
+
+.pain-grid{ display:grid; grid-template-columns:1fr; gap:8px; }
+@media (min-width:768px){ .pain-grid{ grid-template-columns:repeat(2, 1fr); } }
+@media (min-width:1200px){ .pain-grid{ grid-template-columns:repeat(3, 1fr); } }
+.pain-item{
+  display:flex; gap:10px; padding:12px;
+  background:var(--white); border:1px solid rgba(0,0,0,.08);
+  border-radius:var(--r4);
+}
+.pain-num{
+  flex-shrink:0; width:24px; height:24px;
+  border-radius:50%; background:var(--pink-medium); color:var(--nude);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; line-height:1;
+}
+.pain-text{ flex:1; min-width:0; }
+.pain-label{ font-size:13px; font-weight:600; color:var(--text-primary); line-height:1.3; }
+.pain-detail{ font-size:12px; color:var(--g7); line-height:1.45; margin-top:3px; }
+.cust-head{ display:flex; align-items:flex-start; gap:8px; }
+.cust-head-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+/* Sizes match inbox's .cv-name / .cv-sub (the thread header) so a
+   patient name reads at the same scale in both prototypes. */
+.cust-name{
+  font-size:14px; font-weight:600; color:var(--text-primary);
+  line-height:1.25;
+}
+.cust-sub{
+  font-size:11px; color:var(--g7); line-height:1.4;
+}
+/* Urgency pill: same metrics as inbox .ctag / .sp-pill (11/500 / r4). */
+.urgency{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:20px; padding:0 8px; border-radius:var(--r4);
+  font-size:11px; font-weight:500; line-height:1; color:var(--black);
+  border:1px solid transparent; white-space:nowrap;
+}
+.urgency.critical{ background:var(--red-soft); border-color:var(--red-soft); }
+.urgency.high{ background:var(--yellow-soft); border-color:var(--yellow); }
+
+/* Tag metrics match inbox .ctag exactly: 11px / 500 / 2-8 / r20.
+   Keep the dark-grey border — that's the David-MVP customer-card look. */
+.tag-row{ display:flex; gap:6px; flex-wrap:wrap; padding:6px 0; }
+.tag{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:20px; padding:2px 8px; border-radius:var(--r4);
+  background:rgba(66,66,66,.08); border:1px solid #424242;
+  font-size:11px; font-weight:500; line-height:1; color:var(--text-primary);
+  white-space:nowrap;
+}
+
+.fact-row{ display:flex; align-items:center; gap:5px; }
+.fact-row svg{ color:var(--g7); width:14px; height:14px; flex-shrink:0; }
+.fact-row-text{ font-size:13px; line-height:1.3; color:var(--text-primary); }
+
+.ch-row{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  width:100%;
+}
+.ch-icons{ display:flex; align-items:center; gap:6px; height:18px; color:var(--g7); }
+.ch-icon{ width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; }
+.ch-price{ font-size:11px; color:var(--g7); line-height:1; }
+
+.cust-divider{ height:1px; background:var(--g3); width:100%; margin:2px 0; }
+
+.cust-footer{ display:flex; flex-direction:column; gap:3px; }
+/* Footer lines drop to 12px / 400 (matches .ci-preview rhythm). */
+.cust-footer-line{
+  font-size:12px; line-height:1.4; color:var(--g7);
+}
+.cust-footer-line strong{ font-weight:600; color:var(--g7); }
+
+/* ══════════════ UNREAD MESSAGES ══════════════ */
+.unread-list{
+  border:1px solid #B3B3B3; border-radius:var(--r4);
+  overflow:hidden;
+}
+.unread-item{
+  display:flex; padding:8px;
+  background:var(--white);
+  border:1px solid rgba(0,0,0,.1);
+  border-top:0;
+}
+.unread-item:first-child{ border-top:1px solid rgba(0,0,0,.1); }
+.unread-av{
+  width:24px; height:24px; border-radius:50%;
+  background:var(--g3); flex-shrink:0; margin-right:11px;
+  background-image:linear-gradient(135deg,var(--brown),var(--nude));
+  color:var(--white); font-size:10px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+.unread-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; line-height:20px; }
+.unread-name{ font-size:14px; color:var(--text-primary); }
+.unread-msg{ font-size:14px; color:var(--text-primary); opacity:.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.unread-meta{ display:flex; justify-content:space-between; font-size:14px; color:var(--text-primary); opacity:.5; white-space:nowrap; }
+
+/* ══════════════ PIPELINE (kanban) ══════════════ */
+.pipeline{ display:flex; gap:10px; overflow-x:auto; }
+.lane{
+  flex:0 0 280px; min-width:0;
+  background:var(--white);
+  border:1px solid rgba(0,0,0,.23);
+  border-radius:var(--r4);
+  display:flex; flex-direction:column;
+  max-height:560px;
+}
+.lane.cold{ background:var(--g2); border-color:var(--g3); }
+.lane-head{
+  display:flex; align-items:center; gap:8px;
+  padding:12px 14px; border-bottom:1px solid var(--g3);
+  flex-shrink:0;
+}
+.lane-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.lane-title{ font-size:14px; font-weight:600; color:var(--text-primary); }
+.lane-count{
+  margin-left:auto;
+  font-size:12px; color:var(--g7); font-variant-numeric:tabular-nums;
+  background:var(--g2); padding:2px 8px; border-radius:9px;
+}
+.lane-body{ flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:8px; }
+.lane-card{
+  background:var(--white);
+  border:1px solid rgba(0,0,0,.23);
+  border-radius:var(--r4);
+  padding:12px;
+  cursor:pointer; transition:all .12s;
+  display:flex; flex-direction:column; gap:6px;
+}
+.lane-card:hover{ border-color:var(--nude); }
+.lane-card-top{ display:flex; align-items:center; gap:8px; }
+.lane-card-name{ font-size:14px; font-weight:600; color:var(--text-primary); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lane-card-sub{ font-size:14px; color:var(--g7); }
+.lane-card-foot{ display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--g6); }
+.lane-empty{ padding:24px 12px; text-align:center; color:var(--g6); font-size:13px; }
+
+/* ══════════════ TASKS VIEW ══════════════ */
+.tasks-wrap{ display:flex; flex-direction:column; gap:14px; }
+.tasks-block{
+  background:var(--white);
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:var(--r4);
+  overflow:hidden;
+}
+.tasks-block-head{
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px;
+  background:var(--g2); border-bottom:1px solid var(--g3);
+}
+.tasks-block-title{ font-size:14px; font-weight:600; color:var(--text-primary); }
+.tasks-block.overdue .tasks-block-title{ color:var(--red); }
+.tasks-block-count{
+  margin-left:auto;
+  font-size:12px; color:var(--g7); font-weight:600;
+  background:var(--white); border:1px solid var(--g3);
+  padding:2px 8px; border-radius:9px;
+}
+.task-row{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 16px; border-bottom:1px solid var(--g3);
+  cursor:pointer; transition:background .12s;
+}
+.task-row:last-child{ border-bottom:0; }
+.task-row:hover{ background:var(--bg); }
+.task-av{
+  width:32px; height:32px; border-radius:50%;
+  background:linear-gradient(135deg,var(--brown),var(--nude));
+  color:var(--white); font-size:11px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.task-main{ flex:1; min-width:0; }
+.task-name{ font-size:14px; font-weight:600; color:var(--text-primary); }
+.task-sub{ font-size:13px; color:var(--g7); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.task-due{ font-size:13px; color:var(--g6); white-space:nowrap; font-weight:500; }
+.task-due.overdue{ color:var(--red); }
+.task-actions{ display:flex; gap:6px; flex-shrink:0; }
+.task-act{
+  height:32px; padding:0 14px; border-radius:var(--r20);
+  border:1px solid var(--p4); background:var(--white);
+  font-family:inherit; font-size:13px; color:var(--text-primary);
+  cursor:pointer; transition:all .15s;
+}
+.task-act:hover{ background:var(--bg); }
+.task-act.primary{ background:#202020; color:var(--white); border-color:#202020; }
+.task-act.primary:hover{ background:#000; }
+
+/* ══════════════ ENGINE VIEW ══════════════ */
+.engine-wrap{ display:flex; flex-direction:column; gap:14px; }
+.engine-banner{
+  background:linear-gradient(135deg,#FFF6F6,var(--white));
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:var(--r4);
+  padding:16px 18px;
+  display:flex; align-items:center; gap:16px;
+}
+.engine-banner-text{ flex:1; }
+.engine-banner-title{ font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:2px; }
+.engine-banner-sub{ font-size:13px; color:var(--g7); line-height:1.5; }
+.engine-stats{ display:flex; gap:24px; }
+.engine-stat-num{ font-size:22px; font-weight:600; color:var(--text-primary); line-height:1; font-variant-numeric:tabular-nums; }
+.engine-stat-lbl{ font-size:12px; color:var(--g6); margin-top:4px; }
+.engine-section{
+  background:var(--white);
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:var(--r4);
+  overflow:hidden;
+}
+.engine-section-head{
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px; background:var(--g2); border-bottom:1px solid var(--g3);
+}
+.engine-section-title{ font-size:14px; font-weight:600; color:var(--text-primary); }
+.engine-section-count{
+  margin-left:auto;
+  font-size:12px; color:var(--g7); font-weight:600;
+  background:var(--white); border:1px solid var(--g3);
+  padding:2px 8px; border-radius:9px;
+}
+.engine-table{ width:100%; border-collapse:separate; border-spacing:0; }
+.engine-table th{
+  text-align:left; font-size:12px; font-weight:600; color:var(--g6);
+  padding:10px 16px; border-bottom:1px solid var(--g3);
+  background:var(--white); white-space:nowrap;
+}
+.engine-table td{
+  padding:12px 16px; border-bottom:1px solid var(--g3);
+  font-size:14px; color:var(--text-primary); vertical-align:middle;
+}
+.engine-table tr:last-child td{ border-bottom:0; }
+.engine-table tbody tr{ cursor:pointer; transition:background .12s; }
+.engine-table tbody tr:hover{ background:var(--bg); }
+.actor-chip{
+  display:inline-flex; align-items:center; height:22px; padding:0 8px;
+  border-radius:var(--r4); font-size:13px; line-height:1;
+  background:var(--g2); border:1px solid var(--g3); color:var(--g7);
+}
+.actor-chip.system{ background:rgba(90,141,184,.1); border-color:rgba(90,141,184,.4); color:#2A5F88; }
+.actor-chip.human{ background:rgba(150,94,71,.1); border-color:rgba(150,94,71,.4); color:var(--nude); }
+.status-chip{
+  display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 8px;
+  border-radius:var(--r4); font-size:13px; line-height:1;
+  background:var(--g2); border:1px solid var(--g3); color:var(--g7);
+}
+.status-chip.firing{ background:rgba(122,197,88,.1); border-color:rgba(122,197,88,.4); color:#3D8B27; }
+.status-chip.blocked{ background:var(--red-soft); border-color:var(--red); color:var(--black); }
+.engine-mini-btn{
+  padding:4px 12px; border-radius:var(--r20);
+  background:var(--white); border:1px solid var(--p4);
+  font-family:inherit; font-size:13px; color:var(--g7); cursor:pointer;
+}
+.engine-mini-btn:hover{ background:var(--bg); }
+
+/* ══════════════ DRAWER ══════════════ */
+.scrim{
+  position:fixed; inset:0;
+  background:rgba(52,47,44,.35); z-index:200;
+  opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.scrim.open{ opacity:1; pointer-events:auto; }
+.drawer{
+  position:fixed; top:0; right:0; bottom:0;
+  width:540px; max-width:100vw;
+  background:var(--white);
+  border-left:1px solid var(--p4);
+  transform:translateX(100%);
+  transition:transform .25s ease;
+  display:flex; flex-direction:column;
+  box-shadow:-8px 0 30px rgba(52,47,44,.10);
+  z-index:201;
+}
+.drawer.open{ transform:translateX(0); }
+.drawer-head{
+  display:flex; align-items:flex-start; gap:12px;
+  padding:18px 22px;
+  border-bottom:1px solid var(--g3);
+  flex-shrink:0;
+}
+.drawer-av{
+  width:44px; height:44px; border-radius:50%;
+  background:linear-gradient(135deg,var(--brown),var(--nude));
+  color:var(--white); font-size:14px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.drawer-head-main{ flex:1; min-width:0; }
+.drawer-name{ font-size:18px; font-weight:700; color:var(--text-primary); line-height:1.2; }
+.drawer-sub{ font-size:13px; color:var(--g7); margin-top:4px; }
+.drawer-close{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--white); border:1px solid var(--p4);
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+  color:var(--g7); flex-shrink:0;
+}
+.drawer-close:hover{ background:var(--bg); color:var(--black); }
+.drawer-tabs{
+  display:flex; gap:0; padding:0 22px;
+  border-bottom:1px solid var(--g3);
+  flex-shrink:0;
+}
+.drawer-tab{
+  padding:11px 14px;
+  font-family:inherit; font-size:14px; color:var(--g7);
+  background:transparent; border:0; border-bottom:2px solid transparent;
+  cursor:pointer; transition:all .15s; margin-bottom:-1px;
+}
+.drawer-tab.active{ color:var(--nude); border-bottom-color:var(--nude); }
+.drawer-tab:hover{ color:var(--text-primary); }
+.drawer-body{ flex:1; overflow-y:auto; padding:22px; }
+.drawer-pane{ display:none; }
+.drawer-pane.active{ display:block; }
+
+.qa-row{ display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+.qa-btn{
+  height:36px; padding:0 14px; border-radius:var(--r20);
+  border:1px solid var(--p4); background:var(--white);
+  font-family:inherit; font-size:13px; color:var(--text-primary);
+  cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+}
+.qa-btn:hover{ background:var(--bg); }
+.qa-btn.primary{ background:#202020; color:var(--white); border-color:#202020; }
+.qa-btn.primary:hover{ background:#000; }
+.qa-btn.danger:hover{ background:#FBEAE8; border-color:var(--red); color:var(--red); }
+
+.sec-title{
+  font-size:14px; font-weight:600; color:var(--text-primary);
+  margin-bottom:12px;
+  display:flex; align-items:center; gap:8px;
+}
+.sec-title-help{
+  margin-left:auto; font-size:12px; color:var(--g7); font-weight:400;
+}
+.kv-grid{ display:grid; grid-template-columns:130px 1fr; gap:8px 16px; margin-bottom:24px; }
+.kv-label{ font-size:13px; color:var(--g6); }
+.kv-val{ font-size:14px; color:var(--text-primary); }
+.kv-val.muted{ color:var(--g7); }
+
+/* touch-points pane */
+.tp-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:24px; }
+.tp-item{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:12px;
+  border:1px solid var(--g3);
+  border-radius:var(--r4);
+  background:var(--white);
+}
+.tp-item.done{ background:var(--g2); }
+.tp-item.firing{ border-color:rgba(122,197,88,.5); background:rgba(122,197,88,.06); }
+.tp-item.due{ border-color:var(--nude); background:var(--pink-medium); }
+.tp-num{
+  width:26px; height:26px; border-radius:50%;
+  background:var(--white); border:1px solid var(--g3);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:600; color:var(--g7);
+  flex-shrink:0;
+}
+.tp-item.done .tp-num{ background:var(--green); border-color:var(--green); color:var(--white); }
+.tp-item.firing .tp-num{ background:var(--green); border-color:var(--green); color:var(--white); }
+.tp-item.due .tp-num{ background:var(--nude); border-color:var(--nude); color:var(--white); }
+.tp-main{ flex:1; min-width:0; }
+.tp-title{ font-size:14px; font-weight:600; color:var(--text-primary); }
+.tp-target{ font-size:13px; color:var(--g7); margin-left:6px; font-weight:400; }
+.tp-desc{ font-size:13px; color:var(--g7); margin-top:4px; line-height:1.5; }
+.tp-tags{ display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }
+.tp-status{ font-size:12px; color:var(--g7); white-space:nowrap; flex-shrink:0; }
+.tp-status.done{ color:#3D8B27; }
+.tp-status.firing{ color:#3D8B27; }
+.tp-status.due{ color:var(--nude); }
+
+/* suggested action */
+.sa-card{
+  background:linear-gradient(to bottom, #FFF6F6, var(--white));
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:var(--r4);
+  padding:18px; margin-bottom:20px;
+}
+.sa-card-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.sa-card-icon{
+  width:36px; height:36px; border-radius:50%;
+  background:var(--white); border:1px solid var(--g3);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--nude); flex-shrink:0;
+}
+.sa-card-title{ font-size:14px; font-weight:600; color:var(--text-primary); }
+.sa-card-sub{ font-size:12px; color:var(--g7); margin-top:2px; }
+.sa-msg-meta{ font-size:12px; color:var(--g7); margin-bottom:8px; }
+.sa-msg{
+  background:var(--white); border:1px solid var(--g3);
+  border-radius:var(--r4); padding:12px;
+  font-size:14px; line-height:1.55; color:var(--text-primary);
+  white-space:pre-wrap; margin-bottom:12px;
+}
+.sa-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+/* timeline */
+.timeline{ position:relative; padding-left:18px; }
+.timeline::before{
+  content:""; position:absolute; left:7px; top:6px; bottom:6px;
+  width:1px; background:var(--g3);
+}
+.tl-item{ position:relative; padding-bottom:14px; }
+.tl-item:last-child{ padding-bottom:0; }
+.tl-dot{
+  position:absolute; left:-18px; top:4px;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--white); border:2px solid var(--g3);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--g6);
+}
+.tl-item.auto .tl-dot{ border-color:#5A8DB8; color:#5A8DB8; }
+.tl-item.human .tl-dot{ border-color:var(--nude); color:var(--nude); }
+.tl-item.event .tl-dot{ border-color:var(--green); color:var(--green); }
+.tl-head{ display:flex; align-items:baseline; gap:8px; font-size:14px; flex-wrap:wrap; }
+.tl-actor{ font-weight:600; color:var(--text-primary); }
+.tl-action{ color:var(--g7); }
+.tl-time{ margin-left:auto; font-size:12px; color:var(--g6); white-space:nowrap; }
+.tl-body{ font-size:13px; color:var(--g7); margin-top:3px; line-height:1.5; }
+.tl-quote{
+  margin-top:6px; padding:8px 12px;
+  background:var(--pink-medium); border-left:2px solid var(--nude);
+  border-radius:0 var(--r4) var(--r4) 0;
+  font-size:13px; color:var(--text-primary); font-style:italic; line-height:1.5;
+}
+
+/* Empty/stub */
+.stub{
+  padding:48px 32px;
+  background:var(--white); border:1px dashed var(--g3); border-radius:var(--r4);
+  text-align:center; color:var(--g7);
+}
+.stub h3{ font-size:18px; font-weight:600; color:var(--text-primary); margin-bottom:6px; }
+.stub p{ font-size:14px; max-width:480px; margin:0 auto; line-height:1.6; }
+
+/* No legacy max-width responsive overrides — the layout is mobile-first
+   above (default = mobile; min-width:768px adds desktop styles). David's
+   aos-topbar already handles its own mobile rules. */
+</style>
+</head>
+<body>
+
+<!-- ══ TOP BAR — copied from mvp.html so the two prototypes share one
+     canonical shell. The Patients item is active and points at this file;
+     the Inbox item links across to inbox.html. ══ -->
+<div class="aos-topbar" data-testid="topbar">
+  <div class="aos-wordmark" data-testid="wordmark">adoreal.</div>
+  <div class="aos-search" data-testid="topbar-search">
+    <span class="aos-search-icon">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </span>
+    <input type="text" placeholder="Search Patient" disabled/>
+  </div>
+  <nav class="aos-nav">
+    <span class="aos-nav-item" data-testid="topnav-dashboard">Dashboard</span>
+    <span class="aos-nav-item" data-testid="topnav-schedule">Schedule</span>
+    <span class="aos-nav-item active" data-testid="topnav-contact-center">Contact Center</span>
+    <span class="aos-nav-item" data-testid="topnav-financials">Financials</span>
+    <!-- No unread-count badge here — the Inbox badge only appears on the
+         Inbox surface itself (inbox.html). On every other page it's just
+         a plain "Inbox" label so the top bar stays calm. -->
+    <a class="aos-nav-item" href="inbox.html" data-testid="topnav-inbox">Inbox</a>
+  </nav>
+  <div class="aos-right">
+    <button class="aos-icon-btn" title="Notifications" aria-label="Notifications">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><polyline points="3,8 6.5,11.5 13,4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="version-toast-anchor">
+      <button class="aos-icon-btn" title="Settings" aria-label="Settings" onclick="showVersion()" id="aos-settings-btn" data-testid="gear-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <div class="version-toast" id="version-toast" role="status" aria-live="polite">
+        <span class="version-toast-label">Prototype</span>
+        <span class="version-toast-num" id="version-toast-num" data-testid="version-num">v—</span>
+      </div>
+    </div>
+    <div class="aos-user">
+      <div class="aos-user-av">AS</div>
+      <span class="aos-user-name">Alex Smith</span>
+      <span class="aos-user-caret">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHELL ══ -->
+<div class="shell">
+
+  <!-- ── LEFT RAIL ── -->
+  <aside class="rail" data-testid="rail">
+    <button class="rail-item active" data-view="overview" onclick="setView('overview')" data-testid="rail-overview">
+      <span class="rail-item-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      </span>
+      <span class="rail-item-label">Overview</span>
+    </button>
+    <button class="rail-item" data-view="tasks" onclick="setView('tasks')" data-testid="rail-tasks">
+      <span class="rail-item-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/></svg>
+      </span>
+      <span class="rail-item-label">Tasks</span>
+      <span class="rail-item-count" id="rail-tasks-count" data-testid="rail-tasks-count">—</span>
+    </button>
+    <!-- Inbox lives in the top-bar nav (links out to inbox.html) — no
+         duplicate here. Contacts dropped: it added noise without clear
+         purpose at this stage. Rail is now four focused views. -->
+    <button class="rail-item" data-view="pipeline" onclick="setView('pipeline')" data-testid="rail-pipeline">
+      <span class="rail-item-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="13" y2="18"/></svg>
+      </span>
+      <span class="rail-item-label">Pipeline</span>
+    </button>
+    <button class="rail-item" data-view="engine" onclick="setView('engine')" data-testid="rail-engine">
+      <span class="rail-item-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg>
+      </span>
+      <span class="rail-item-label">Engine</span>
+    </button>
+    <button class="rail-item" data-view="analytics" onclick="setView('analytics')" data-testid="rail-analytics">
+      <span class="rail-item-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="10"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="14"/><line x1="22" y1="20" x2="2" y2="20"/></svg>
+      </span>
+      <span class="rail-item-label">Analytics</span>
+    </button>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main" data-testid="main">
+
+    <!-- Page title row -->
+    <div class="page-head">
+      <h1 class="page-title" id="page-title" data-testid="page-title">Overview</h1>
+      <div class="page-head-right">
+        <span class="assigned-label">Assigned to:</span>
+        <button class="selector">
+          Myself
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="btn-primary" onclick="alert('Add contact — flow lives in v0.4')" data-testid="btn-add-contact">Add contact</button>
+      </div>
+    </div>
+
+    <!-- View-specific content slots
+         No persistent banner above the views. The TOP of each view is
+         set by that view itself — Overview opens with the work-driving
+         "today" strip + Critical tasks; Analytics owns Performance. -->
+    <section id="view-overview" class="view-pane" data-testid="view-overview">
+      <!-- Today strip — four work-driving counts, each clickable. This is
+           the top of Overview and it has to earn it: every number is
+           actionable (clear urgent, do tasks, triage new, address
+           complications). Vanity metrics (conversion rates, $ pipeline)
+           live on the Analytics view, not here. The new-today count
+           keeps the Phase 1 system/human split as a sub-line. -->
+      <div class="today-strip" data-testid="today-strip">
+        <button class="today-stat" data-testid="today-urgent" onclick="setView('tasks')">
+          <span class="today-num" id="today-urgent-val">—</span>
+          <span class="today-lbl">urgent</span>
+          <span class="today-meta">complications + stale</span>
+        </button>
+        <button class="today-stat" data-testid="today-tasks" onclick="setView('tasks')">
+          <span class="today-num" id="today-tasks-val">—</span>
+          <span class="today-lbl">tasks due</span>
+          <span class="today-meta" id="today-tasks-meta">— overdue</span>
+        </button>
+        <button class="today-stat" data-testid="today-new" onclick="setView('pipeline')">
+          <span class="today-num" id="today-new-val">—</span>
+          <span class="today-lbl">new today</span>
+          <span class="today-meta" id="today-new-meta">— system · — human</span>
+        </button>
+        <button class="today-stat" data-testid="today-complications" onclick="setView('tasks')">
+          <span class="today-num" id="today-comp-val">—</span>
+          <span class="today-lbl">complications</span>
+          <span class="today-meta">need human eyes</span>
+        </button>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-row-head">
+          <span class="kpi-row-title">Critical tasks</span>
+          <a class="kpi-row-link" id="critical-link">view all (—)</a>
+        </div>
+        <div class="cards-row" id="critical-cards"></div>
+      </div>
+
+      <!-- 7-stage journey legend — palette synced with inbox.html (v0.41). -->
+      <div class="kpi-row" data-testid="view-stages">
+        <div class="kpi-row-head">
+          <span class="kpi-row-title">Seven-stage patient journey</span>
+          <span class="kpi-row-link" style="color:var(--g7);cursor:default">cool/soft early → warm/settled late</span>
+        </div>
+        <div class="stage-legend" id="stage-legend"></div>
+      </div>
+
+    </section>
+
+    <section id="view-tasks" class="view-pane" style="display:none" data-testid="view-tasks">
+      <div class="tasks-wrap" id="tasks-wrap"></div>
+    </section>
+
+    <section id="view-pipeline" class="view-pane" style="display:none" data-testid="view-pipeline">
+      <div class="pipeline" id="pipeline"></div>
+    </section>
+
+    <section id="view-engine" class="view-pane" style="display:none" data-testid="view-engine">
+      <div class="engine-wrap" id="engine-wrap"></div>
+    </section>
+
+    <!-- Analytics — where Performance lives now.
+         Sofia's Figma frame put these five cards above the fold on
+         Overview; that put weekly clinic-owner metrics ahead of the
+         CEA's daily queue. The metrics are still here, just one tab
+         away. Today's strip on Overview covers the work-driving counts. -->
+    <section id="view-analytics" class="view-pane" style="display:none" data-testid="view-analytics">
+      <div class="kpi-row" data-testid="kpi-row">
+        <div class="kpi-row-head">
+          <span class="kpi-row-title">Performance last 7 days</span>
+          <span class="kpi-row-link" style="color:var(--g7);cursor:default">trailing 7 days · all clinics</span>
+        </div>
+        <div class="kpi-strip">
+          <div class="kpi-card" data-testid="kpi-new-leads">
+            <div class="kpi-stat">
+              <span id="kpi-new-leads-val">—</span>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 11V3M7 3l-3 3M7 3l3 3" stroke="#3D8B27" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="kpi-label">New leads today</div>
+            <div class="kpi-delta">+10% last seven days</div>
+          </div>
+          <div class="kpi-card" data-testid="kpi-today-tasks">
+            <div class="kpi-stat"><span id="kpi-tasks-val">—</span></div>
+            <div class="kpi-label">Today's tasks</div>
+            <div class="kpi-delta" id="kpi-tasks-delta">+8 critical tasks</div>
+          </div>
+          <div class="kpi-card" data-testid="kpi-pipeline-value">
+            <div class="kpi-stat"><span id="kpi-pipeline-val">—</span></div>
+            <div class="kpi-label">Opportunity in pipeline</div>
+            <div class="kpi-delta">+4% last seven days</div>
+          </div>
+          <div class="kpi-card" data-testid="kpi-conversion">
+            <div class="kpi-stat"><span id="kpi-conv-val">—</span></div>
+            <div class="kpi-label">Lead conversion rate</div>
+            <div class="kpi-delta">+8% last seven days</div>
+          </div>
+          <div class="kpi-card" data-testid="kpi-consult-conv">
+            <div class="kpi-stat"><span id="kpi-consult-val">—</span></div>
+            <div class="kpi-label">Consult conversion rate</div>
+            <div class="kpi-delta">+5% last seven days</div>
+          </div>
+        </div>
+      </div>
+      <div class="stub" style="margin-top:8px">
+        <h3>More analytics coming</h3>
+        <p>Conversion funnel by stage, speed-to-lead trend, channel mix, system-vs-human contribution, and per-clinic drill-downs land here in a later iteration.</p>
+      </div>
+    </section>
+
+    <section id="view-stub" class="view-pane" style="display:none" data-testid="view-stub">
+      <div class="stub">
+        <h3 id="stub-title">View not yet built</h3>
+        <p id="stub-body">This surface exists in the Figma but isn't part of the current v0.3 scope. It will land in a later iteration of the LMS prototype.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ══ DRAWER ══ -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" data-testid="drawer">
+  <div class="drawer-head">
+    <div class="drawer-av" id="d-av">—</div>
+    <div class="drawer-head-main">
+      <div class="drawer-name" id="d-name">—</div>
+      <div class="drawer-sub" id="d-sub">—</div>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()" aria-label="Close" data-testid="drawer-close">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><line x1="4" y1="4" x2="12" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="12" y1="4" x2="4" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <nav class="drawer-tabs">
+    <button class="drawer-tab active" data-pane="overview" onclick="setPane('overview')">Overview</button>
+    <button class="drawer-tab" data-pane="touchpoints" onclick="setPane('touchpoints')">Touch-points</button>
+    <button class="drawer-tab" data-pane="suggested" onclick="setPane('suggested')">Suggested action</button>
+    <button class="drawer-tab" data-pane="timeline" onclick="setPane('timeline')">Timeline</button>
+  </nav>
+  <div class="drawer-body">
+    <section class="drawer-pane active" id="pane-overview">
+      <div class="qa-row">
+        <button class="qa-btn primary">Call</button>
+        <button class="qa-btn">WhatsApp</button>
+        <button class="qa-btn">Email</button>
+        <button class="qa-btn">Book</button>
+        <!-- Open conversation is the cross-prototype bridge to inbox.html.
+             Channel-aware buttons (Call/WhatsApp/Email) are intended to
+             route to that specific channel on the inbox side eventually;
+             for now they're stubs and "Open conversation" is the working
+             handoff. Anchor href is rewritten in openDrawer() to include
+             the patient id. -->
+        <a class="qa-btn" id="d-open-thread" href="inbox.html">Open conversation →</a>
+      </div>
+      <div class="sec-title">Person details</div>
+      <div class="kv-grid" id="kv-details"></div>
+      <div class="sec-title">"Why now" trigger<span class="sec-title-help">First question to ask</span></div>
+      <div class="kv-val muted" id="why-now-text" style="margin-bottom:24px">—</div>
+    </section>
+    <section class="drawer-pane" id="pane-touchpoints">
+      <div class="sec-title">Touch-point sequence<span class="sec-title-help">From Journeys-Workflows.pdf</span></div>
+      <div class="tp-list" id="tp-list"></div>
+    </section>
+    <section class="drawer-pane" id="pane-suggested">
+      <div id="sa-mount"></div>
+      <div class="sec-title">Why this suggestion</div>
+      <div class="kv-val muted" id="sa-reason">—</div>
+    </section>
+    <section class="drawer-pane" id="pane-timeline">
+      <div class="sec-title">Activity timeline<span class="sec-title-help">Auto + human events</span></div>
+      <div class="timeline" id="timeline"></div>
+    </section>
+  </div>
+</aside>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────────────
+   v0.3 — data, renders, and the small set of pure functions Playwright
+   reaches via `window.__lms` for unit-style tests.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const VERSION = '0.5';
+
+/* === Domain constants ================================================== */
+
+/* Seven-stage patient journey — palette matches the vision prototype
+   (adoreal_unified_inbox_v0_41.html lines 2337-2343). Same `bg`/`fg` are
+   re-exposed here so the LMS pipeline lanes, drawer chips and the legend
+   on Overview all paint from one source. */
+const STAGES = [
+  {id:'discover', label:'Discover',  dot:'#FEF8E7', text:'#7A5C00', meaning:'First interest, before consultation'},
+  {id:'consult',  label:'Consult',   dot:'#6CC9D2', text:'#0D4A52', meaning:'Consultation booked or attended'},
+  {id:'decide',   label:'Decide',    dot:'#C4B6FF', text:'#3A2B7A', meaning:'Post-consult, weighing options'},
+  {id:'preop',    label:'Pre-op',    dot:'#FFA96C', text:'#6E3300', meaning:'Booked surgery, preparing'},
+  {id:'surgery',  label:'Surgery',   dot:'#F4A6B0', text:'#7A1F2C', meaning:'Day-of surgery'},
+  {id:'recover',  label:'Recover',   dot:'#F8B8D0', text:'#7A2244', meaning:'Post-surgery healing'},
+  {id:'longterm', label:'Long-term', dot:'#B8E0C8', text:'#22542F', meaning:'Established relationship, retention'},
+];
+
+const SOURCES = {
+  'web-form':  {label:'Web form'},
+  'whatsapp':  {label:'WhatsApp'},
+  'instagram': {label:'Instagram'},
+  'facebook':  {label:'Facebook'},
+  'google':    {label:'Google'},
+  'referral':  {label:'Referral'},
+  'katie':     {label:'Katie'},
+  'phone':     {label:'Phone'},
+  'email':     {label:'Email'},
+  'walkin':    {label:'Walk-in'},
+};
+
+/* Providers and clinic-of-record kept consistent with inbox.html (v0.41
+   seed). When you click a person from either prototype you get the same
+   surgeon, clinic and procedure. */
+const SURGEONS = {
+  nunnari:   {name:'Dr. Nunnari',   clinic:'iQonic'},
+  lindstrom: {name:'Dr. Lindström', clinic:'Reform Kliniken'},
+  hansen:    {name:'Dr. Hansen',    clinic:'Reform Kliniken — Copenhagen'},
+  mueller:   {name:'Dr. Mueller',   clinic:"Pantheon's Clinic"},
+  williams:  {name:'Dr. Williams',  clinic:'The Langham Hospital'},
+};
+
+/* The twelve pain-points the LMS is built to retire. Implied by the
+   features in adoreal_unified_inbox_v0_41.html — distilled here as design
+   context, not as user-facing content. Lives in FEATURE_MAP.md as the
+   public-facing reference. */
+const PAIN_POINTS = [
+  {id:1,  label:'People-dependent contact orchestration', detail:'Every reminder / nudge / reply requires a staffer to send it manually.'},
+  {id:2,  label:'Channel siloes',                          detail:'WhatsApp, SMS, email, Instagram, Facebook each live in separate tools.'},
+  {id:3,  label:'No suggested next step',                  detail:"Staff stare at a blank reply box; nothing surfaces what the smart next move is."},
+  {id:4,  label:'No bulk action',                          detail:'Cannot message N patients of a provider in one go (e.g. doctor is out).'},
+  {id:5,  label:'Manual stage progression',                detail:"Patient stays in 'Lead — in conversation' forever unless someone drags them."},
+  {id:6,  label:'Complications untracked',                 detail:'No flag for patients who need extra hand-holding or have a clinical concern.'},
+  {id:7,  label:'Phone calls invisible',                   detail:'Calls happen on personal phones; the CRM never sees them.'},
+  {id:8,  label:'Failed messages silent',                  detail:'A bounced SMS or undelivered email surfaces nowhere — staff find out from the patient.'},
+  {id:9,  label:'No Patient 360',                          detail:'Clinical context, billing, scheduling and comms each live in a different app.'},
+  {id:10, label:'No re-engagement automation',             detail:'Long-term and gone-cold patients drift off; no testimonial / review / ultrasound tracks.'},
+  {id:11, label:'CRM expertise required',                  detail:"Today's tool demands MS Dynamics fluency from staff who never trained on it."},
+  {id:12, label:'Templates locked',                        detail:'Auto-messages are static — content cannot be tuned per clinic without engineering.'},
+];
+
+/* Touch-point template — canonical cadence from Journeys-Workflows.pdf
+   (Vanessa Castro / Loop, Sep 2025). Number is intentionally adaptive;
+   per Johan we say "touch-points" not "9-point". */
+const TP_TEMPLATE = [
+  {n:'0',  title:'Enquiry acknowledgement',                            target:'Instant',                          channel:'email',     actor:'system',  desc:'"Thank you for your enquiry" fires on lead creation, any channel.'},
+  {n:'1',  title:'Welcome email + SMS reply prompt',                   target:'T+10 min',                         channel:'email,sms', actor:'system',  desc:'Service welcome email + SMS reply prompt.'},
+  {n:'1b', title:'Call task (after no answer)',                        target:'T+24h',                            channel:'call',      actor:'human',   desc:'Clinic call task. Due immediately.'},
+  {n:'2',  title:'SMS + email follow-up',                              target:'After no-answer call',             channel:'email,sms', actor:'system',  desc:'CTA: reply / book consultation.'},
+  {n:'2b', title:'Call task',                                          target:'T+5d',                             channel:'call',      actor:'human',   desc:'Clinic call task.'},
+  {n:'3',  title:'SMS + email follow-up',                              target:'After no-answer call',             channel:'email,sms', actor:'system',  desc:'5d after Touch 2.'},
+  {n:'3b', title:'Call task + move to Follow-up 2',                    target:'T+7d',                             channel:'call',      actor:'human',   desc:'Auto-move stage (Mike: "can this be automated?").'},
+  {n:'4',  title:'SMS + email · educational content',                  target:'T+10min after move',               channel:'email,sms', actor:'system',  desc:'Service-specific educational content.'},
+  {n:'4b', title:'Call task',                                          target:'T+7d',                             channel:'call',      actor:'human',   desc:'Clinic call task.'},
+  {n:'5',  title:'SMS + email follow-up',                              target:'After no-answer call',             channel:'email,sms', actor:'system',  desc:'7d after Touch 4.'},
+  {n:'5b', title:'Call task + move to Follow-up 3',                    target:'T+7d',                             channel:'call',      actor:'human',   desc:'Auto-move to Follow-up 3.'},
+  {n:'6',  title:'Repeat Contact 5 pattern',                           target:'—',                                channel:'mixed',     actor:'mixed',   desc:'Clinic call → SMS+email → call task.'},
+  {n:'7',  title:'Repeat Contact 5 pattern',                           target:'—',                                channel:'mixed',     actor:'mixed',   desc:'Same as Touch 6.'},
+  {n:'8',  title:'Post-task SMS+email + "Last attempt" task',          target:'T+7d after task',                  channel:'mixed',     actor:'mixed',   desc:'Email+SMS on task done; 7d later "Last attempt" task.'},
+  {n:'9',  title:'Final call + SMS + email → Gone cold',               target:'T+24h after final',                channel:'mixed',     actor:'mixed',   desc:'Final call → if no answer, auto SMS+email then 24h auto-move to Gone cold.'},
+];
+
+/* === Pure functions exposed for unit tests ============================ */
+
+function buildTouchPoints(idx){
+  return TP_TEMPLATE.map((tp, i) => {
+    let status;
+    if (i < idx) status = 'done';
+    else if (i === idx) status = (tp.actor === 'human') ? 'due' : 'firing';
+    else status = 'pending';
+    return Object.assign({}, tp, {status});
+  });
+}
+
+function isUrgent(p){ return p.leadScore >= 80; }
+function isUncontacted(p){ return !p.contactedByHuman && p.tpIndex <= 2; }
+/* Staleness only applies in the top-of-funnel stages (Discover / Consult /
+   Decide). Once someone is Pre-op or further, the conversation is already
+   established and "haven't replied in 24h" doesn't carry the same weight. */
+function isStale(p){
+  if (!['discover','consult','decide'].includes(p.stage)) return false;
+  const lc = p.lastContactMinutesAgo;
+  const last = lc == null ? p.createdMinutesAgo : Math.min(lc, p.createdMinutesAgo);
+  return last > 60 * 24;
+}
+function urgencyLevel(p){
+  if (p.flagged)                       return 'critical';   // complication-flagged always rises
+  if (isStale(p) && p.leadScore >= 70) return 'critical';
+  if (isStale(p) || isUrgent(p))       return 'high';
+  return 'none';
+}
+
+/* === Seed data — same nine patients as inbox.html (v0.41) =================
+   Click any of these in either prototype and the surgeon / procedure /
+   stage / story is identical. The LMS adds its own fields on top
+   (leadScore, tpIndex, reviewConcerns, suggestedAction, whyNowText) —
+   they're LMS-specific and don't exist in the inbox prototype. */
+
+let people = [
+  /* Discover — first interest, before consultation */
+  {id:0, name:'Emma Lindqvist', initials:'EL', stage:'discover', leadScore:78,
+   surgeon:'lindstrom', source:'instagram', procedure:'Rhinoplasty',
+   tags:['New','Researching'], sub:'Lead — researching',
+   est:6500, createdMinutesAgo:48, lastContactMinutesAgo:34,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:3,
+   reviewConcerns:1, pendingMessageDays:0, dueDate:'Today, 14:00',
+   whyNowText:'Researching rhinoplasty for some time. Found us via Instagram. Anaesthesia anxiety + work-from-home recovery questions surfaced.',
+   suggestedAction:{channel:'whatsapp',
+     draft:"That's such a natural concern, Emma — anaesthesia worries are really common. We use a highly experienced anaesthesiologist for every procedure. As for working from home, most patients manage light desk work from day 5–7. I'd love to book you in for a consultation to go through everything. Would next week suit you?",
+     reason:'Patient asked two distinct questions in one WhatsApp message. The draft addresses both directly without over-promising and ends with a soft booking ask. Channel-native (WhatsApp = staying where she started).'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'New lead via Instagram', when:'48 min ago'},
+     {kind:'auto',  actor:'System (auto)', what:'Welcome WhatsApp + Email sent', when:'46 min ago'},
+     {kind:'human', actor:'Sarah K. (CEA)', what:'replied (WhatsApp)', when:'34 min ago', body:'Booked Thu 17 April 14:00 with Dr. Lindström.'},
+   ]},
+
+  {id:2, name:'Laura Müller', initials:'LM', stage:'discover', leadScore:76,
+   surgeon:'mueller', source:'instagram', procedure:'Tummy tuck',
+   tags:['Post-pregnancy','Reschedule'], sub:'Wants to reschedule', flagged:true,
+   est:7800, createdMinutesAgo:60*26, lastContactMinutesAgo:60,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:2,
+   reviewConcerns:1, pendingMessageDays:1, dueDate:'Today',
+   whyNowText:'Second baby 8 months ago. Came in via Instagram, switched to SMS. Asked to reschedule to next week — needs same-day reply.',
+   suggestedAction:{channel:'sms',
+     draft:"Hi Laura, absolutely no problem — flexibility is completely fine at this stage. We have two slots available next week: Monday 28 April at 10:00 or Wednesday 30 April at 15:00. Both are with Dr. Mueller for an initial tummy tuck consultation, no commitment required. Which would suit you better?",
+     reason:'Reschedule request flagged as a complication because no same-day reply = lead drift. Two specific slots reduce friction. Reuses her preferred channel (SMS).'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'New lead via Instagram DM', when:'1d 2h ago'},
+     {kind:'auto',  actor:'System (auto)', what:'Consent form sent', when:'1d ago'},
+     {kind:'human', actor:'Sarah K. (CEA)', what:'replied (SMS)', when:'1h ago'},
+   ]},
+
+  /* Consult — consultation booked or attended */
+  {id:9, name:'Yuki Tanaka', initials:'YT', stage:'consult', leadScore:62,
+   surgeon:'nunnari', source:'referral', procedure:'Eyelid surgery',
+   tags:['Cancellation'], sub:'Cancellation request', flagged:true,
+   est:4500, createdMinutesAgo:60*24*10, lastContactMinutesAgo:60*2,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:5,
+   reviewConcerns:2, pendingMessageDays:0, dueDate:'Today',
+   whyNowText:'Referred by friend Akiko, booked consultation 10 days ago. Now explicit cancellation request — needs a graceful follow-up to understand "why" without pressure.',
+   suggestedAction:{channel:'email',
+     draft:"Hi Yuki, of course — completely understandable. I've cancelled your appointment and there's no fee. If anything changes in the future, we're always here. Would you mind sharing if there's anything specific that prompted the change? No pressure to share, just helps us improve.",
+     reason:'Cancellation handled gracefully = retention probability for future. The "no pressure" framing protects trust; the open question gives us learnings without demanding a reason.'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'New referral lead', when:'10d ago'},
+     {kind:'auto',  actor:'System (auto)', what:'Consultation booked', when:'10d ago'},
+     {kind:'event', actor:'Yuki Tanaka', what:'cancellation request received', when:'2h ago'},
+   ]},
+
+  {id:5, name:'Priya Nair', initials:'PN', stage:'consult', leadScore:84,
+   surgeon:'mueller', source:'referral', procedure:'Liposuction',
+   tags:['Referred','Pre-op forms in'], sub:'Sent pre-op forms',
+   est:8500, createdMinutesAgo:60*24*14, lastContactMinutesAgo:60*24,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:6,
+   reviewConcerns:0, pendingMessageDays:0, dueDate:null,
+   whyNowText:'Referred by colleague. Pre-op forms completed. One open question: recovery timeline for a work trip in 6 weeks — needs to be flagged in surgeon notes pre-consult.',
+   suggestedAction:{channel:'email',
+     draft:"Hi Priya, thank you so much — everything has come through perfectly. You're all set for your consultation. On the work trip question: liposuction recovery is typically 1–2 weeks for light activity, and 4–6 weeks before full exertion. Dr. Mueller will map out a precise timeline for your specific case when you meet, so six weeks is genuinely worth discussing. I'll make sure that's flagged in her notes before your appointment.",
+     reason:'Pre-op forms in = positive signal. Address the work-trip concern directly + commit to briefing the surgeon = Reliability + Intimacy. No upsell, no pressure.'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'New referral lead', when:'2w ago'},
+     {kind:'auto',  actor:'System (auto)', what:'Pre-consultation form sent', when:'2w ago'},
+     {kind:'human', actor:'Priya Nair', what:'submitted forms', when:'1d ago'},
+   ]},
+
+  /* Decide — post-consult, weighing options */
+  {id:12, name:'Mei Kowalski', initials:'MK', stage:'decide', leadScore:55,
+   surgeon:'williams', source:'facebook', procedure:'Laser hair removal',
+   tags:['MedSpa','Price-sensitive'], sub:'Comparing prices',
+   est:510, createdMinutesAgo:60*24*3, lastContactMinutesAgo:60*24,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:7,
+   reviewConcerns:0, pendingMessageDays:0,
+   whyNowText:'Facebook enquiry, comparing prices. Received price list, replied "Ok thanks for the info" — neutral; not pushed forward yet.',
+   suggestedAction:{channel:'email',
+     draft:"You're so welcome, Mei! Take all the time you need. Whenever you're ready to chat further or book a consultation, we're here. No pressure at all.",
+     reason:'Cold-trail moment. Pressure here destroys the relationship. Leave the door open and let her come back when ready.'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'Facebook enquiry', when:'3d ago'},
+     {kind:'human', actor:'Sarah K. (CEA)', what:'sent price list', when:'3d ago'},
+     {kind:'human', actor:'Mei Kowalski', what:'"Ok thanks for the info"', when:'1d ago'},
+   ]},
+
+  /* Pre-op — booked surgery, preparing */
+  {id:1, name:'Sofie Andersen', initials:'SA', stage:'preop', leadScore:91,
+   surgeon:'hansen', source:'referral', procedure:'Breast augmentation',
+   tags:['Confirmed Thursday'], sub:'Confirmed — see you Thursday ✓',
+   est:8200, createdMinutesAgo:60*24*3, lastContactMinutesAgo:18,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:10,
+   reviewConcerns:0, pendingMessageDays:0,
+   whyNowText:'Post-pregnancy. Wants natural result. Partner supportive. Price not a concern. Ready to proceed.',
+   suggestedAction:{channel:'email',
+     draft:"Hi Sofie! Just confirming we have you booked for Thursday at 14:00 with Dr. Hansen. Please remember to complete your pre-consultation questionnaire beforehand. Looking forward to meeting you!",
+     reason:'Pre-op confirmation. Short and warm. The questionnaire reminder is the single critical action item.'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'Referral lead', when:'3d ago'},
+     {kind:'human', actor:'Jessica M. (CEA)', what:'booked Thursday 14:00', when:'2d ago'},
+     {kind:'human', actor:'Sofie Andersen', what:'"Confirmed — see you Thursday ✓"', when:'18 min ago'},
+   ]},
+
+  /* Surgery — day-of */
+  {id:13, name:'Beatrice Johansson', initials:'BJ', stage:'surgery', leadScore:95,
+   surgeon:'lindstrom', source:'referral', procedure:'Rhinoplasty',
+   tags:['Day-of'], sub:'Surgery Monday 09:00',
+   est:7800, createdMinutesAgo:60*24*7, lastContactMinutesAgo:60*24*2,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:11,
+   reviewConcerns:0, pendingMessageDays:2,
+   whyNowText:'Friend Eva referred. Was nervous; addressed pain management. Surgery confirmed Monday 28 April 09:00 with pre-op fasting from midnight Sunday.',
+   suggestedAction:{channel:'whatsapp',
+     draft:"Hi Beatrice! See you Monday at 9:00am sharp. Remember to fast from midnight Sunday. The team will be ready and Dr. Lindström will pop in to see you before the procedure begins. You're going to be wonderfully looked after.",
+     reason:'Day-of warmth. Concrete instructions (fast from midnight) + reassurance (team ready, surgeon will check in). No new asks.'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'Referral lead', when:'1w ago'},
+     {kind:'human', actor:'Dr. Lindström', what:'consultation', when:'5d ago'},
+     {kind:'auto',  actor:'System (auto)', what:'Surgery confirmation sent', when:'4d ago'},
+   ]},
+
+  /* Recover — post-surgery healing */
+  {id:3, name:'Charlotte Webb', initials:'CW', stage:'recover', leadScore:92,
+   surgeon:'nunnari', source:'google', procedure:'Facelift',
+   tags:['VIP','Referrer'], sub:'4 weeks post-op',
+   est:12400, createdMinutesAgo:60*24*56, lastContactMinutesAgo:3,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:14,
+   reviewConcerns:1, pendingMessageDays:0, flagged:true,
+   whyNowText:'Milestone birthday (55). Very private about the procedure. Happy with result — comparing to friend\'s outcome positively. Already referred her friend Margaret.',
+   suggestedAction:{channel:'whatsapp',
+     draft:"That's so lovely to hear, Charlotte — thank you for sharing that! It genuinely means a lot to everyone here. Your recovery is going beautifully. Just a reminder that your 6-week post-op review is coming up — we'll be in touch shortly to confirm a time with Dr. Nunnari. In the meantime, please don't hesitate to reach out if anything comes up.",
+     reason:'Recover-stage warmth + the 6-week review nudge. Note: the previous SMS attempt failed — needs to land via her preferred WhatsApp channel this time (complication-flagged for this reason).'},
+   timeline:[
+     {kind:'human', actor:'Dr. Nunnari', what:'facelift completed', when:'4w ago'},
+     {kind:'auto',  actor:'System (auto)', what:'Post-op day-1 check-in', when:'4w ago'},
+     {kind:'auto',  actor:'System (auto)', what:'2-week post-op check-in', when:'2w ago'},
+     {kind:'human', actor:'Charlotte Webb', what:'"Thanks so much, feeling much better!"', when:'3h ago'},
+     {kind:'event', actor:'System (auto)', what:'⚠ 6-week review SMS failed to deliver', when:'2h ago'},
+   ]},
+
+  /* Long-term — established relationship, retention */
+  {id:14, name:'Camille Olsen', initials:'CO', stage:'longterm', leadScore:70,
+   surgeon:'hansen', source:'instagram', procedure:'Lip filler',
+   tags:['Long-term','Considering revision'], sub:'Considering small revision',
+   est:380, createdMinutesAgo:60*24*180, lastContactMinutesAgo:60*24*3,
+   contactedByHuman:true, contactedBySystem:true, tpIndex:14,
+   reviewConcerns:0, pendingMessageDays:3,
+   whyNowText:'Established patient. Has been weighing a small lip revision for weeks. "I haven\'t decided yet, will be in touch."',
+   suggestedAction:{channel:'email',
+     draft:"Hi Camille, no pressure at all — take all the time you need. Whenever you're ready, we're here. In the meantime if you have any questions just let us know.",
+     reason:'Long-term relationship. The right move here is to NOT push. Stay warm, stay available. Camille books when she\'s ready and the trust stays intact.'},
+   timeline:[
+     {kind:'event', actor:'System (auto)', what:'Original lip filler', when:'6 months ago'},
+     {kind:'human', actor:'Camille Olsen', what:'enquired about revision', when:'1w ago'},
+     {kind:'human', actor:'Camille Olsen', what:'"I haven\'t decided yet, will be in touch"', when:'3d ago'},
+   ]},
+];
+
+/* === Render: KPIs ====================================================== */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtAgo = m => m == null ? '—' : m < 60 ? m + 'm' : m < 1440 ? Math.floor(m/60) + 'h' : Math.floor(m/1440) + 'd';
+const fmtMoney = n => n === 0 ? '—' : '$ ' + n.toLocaleString('en-US');
+
+/* renderToday — the work-driving strip at the top of Overview.
+   Each count is derived from the actual people array; clicking a stat
+   routes to the view that lets you act on it. No vanity numbers here. */
+function renderToday(){
+  const tasks = people.filter(p => {
+    const tp = buildTouchPoints(p.tpIndex)[p.tpIndex];
+    return tp && tp.actor === 'human' && tp.status === 'due';
+  });
+  const overdueTasks  = tasks.filter(t => isStale(t));
+  const urgent        = people.filter(p => urgencyLevel(p) === 'critical');
+  const complications = people.filter(p => p.flagged);
+  const newToday      = people.filter(p => p.createdMinutesAgo < 60*24);
+  const newSystem     = newToday.filter(p => p.contactedBySystem && !p.contactedByHuman).length;
+  const newHuman      = newToday.filter(p => p.contactedByHuman).length;
+
+  $('today-urgent-val').textContent = urgent.length;
+  $('today-tasks-val').textContent  = tasks.length;
+  $('today-tasks-meta').textContent = overdueTasks.length === 0 ? 'none overdue' : `${overdueTasks.length} overdue`;
+  $('today-new-val').textContent    = newToday.length;
+  $('today-new-meta').textContent   = `${newSystem} system · ${newHuman} human`;
+  $('today-comp-val').textContent   = complications.length;
+
+  /* Side-effect: rail count badge tracks tasks-due as well. Keeps the
+     bottom-tab Tasks count in sync with what Overview promised. */
+  $('rail-tasks-count').textContent = tasks.length;
+}
+
+/* renderAnalytics — only renders when the Analytics view is open.
+   Five Sofia-Figma cards (new leads / tasks / opportunity / conv. /
+   consult conv.) + the deferred-features stub block. */
+function renderAnalytics(){
+  $('kpi-new-leads-val').textContent = people.filter(p => p.createdMinutesAgo < 60*24).length || 23;
+  const tasks = people.filter(p => {
+    const tp = buildTouchPoints(p.tpIndex)[p.tpIndex];
+    return tp && tp.actor === 'human' && tp.status === 'due';
+  });
+  $('kpi-tasks-val').textContent = tasks.length || 3;
+  $('kpi-tasks-delta').textContent = '+' + people.filter(p => urgencyLevel(p) === 'critical').length + ' critical tasks';
+  $('kpi-pipeline-val').textContent = '$' + people.reduce((a,p) => a + p.est, 0).toLocaleString('en-US');
+  $('kpi-conv-val').textContent = '51%';
+  $('kpi-consult-val').textContent = '71%';
+}
+
+/* === Render: Overview view ============================================ */
+
+/* Tasks created via inbox.html's "Create task" modal land in localStorage
+   under this key. Both prototypes read/write here — the lms shows them
+   in the Critical tasks rail alongside patient-derived critical cards. */
+const TASK_STORAGE_KEY = 'adoreal_critical_tasks';
+function loadCreatedTasks(){
+  try { return JSON.parse(localStorage.getItem(TASK_STORAGE_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+
+function renderOverview(){
+  /* Overview: Critical tasks → 7-stage legend.
+     Unread messages deliberately omitted — that surface lives in inbox.html.
+     Critical tasks are now a union of two sources:
+       1. patient-derived (urgent/flagged/stale + reviewConcerns)
+       2. user-created via inbox.html's "Create task" modal (filtered to
+          tasks marked "Critical" in that modal) */
+  const patientCritical = people.filter(p => p.reviewConcerns != null && (urgencyLevel(p) !== 'none' || p.pendingMessageDays != null));
+  const createdCritical = loadCreatedTasks().filter(t => t.critical);
+
+  const totalCount = patientCritical.length + createdCritical.length;
+  $('critical-link').textContent = `view all (${totalCount})`;
+  $('critical-cards').innerHTML = [
+    ...createdCritical.map(renderCreatedTaskCard),
+    ...patientCritical.slice(0, 4).map(renderCustCard),
+  ].join('');
+
+  document.querySelectorAll('#critical-cards .cust-card[data-id]').forEach(el => {
+    el.addEventListener('click', () => openDrawer(parseInt(el.dataset.id, 10)));
+  });
+
+  /* 7-stage legend — palette from STAGES const (matches v0.41 sp-* CSS). */
+  $('stage-legend').innerHTML = STAGES.map(s => `
+    <div class="stage-row" data-testid="stage-${s.id}">
+      <span class="stage-pill" style="background:${s.dot};color:${s.text}">${esc(s.label)}</span>
+      <span class="stage-meaning">${esc(s.meaning)}</span>
+    </div>
+  `).join('');
+
+  /* Pain-points are design context, not user-facing real estate. The
+     PAIN_POINTS const remains exposed on window.__lms for the feature
+     map + future internal surfaces — not rendered on Overview. */
+}
+
+/* Render a card for a user-created task (came from inbox.html's modal).
+   Visually a calm-variant cust-card with an "Open conversation" CTA that
+   deep-links back to inbox.html?patient=<id>. The "i" badge in the corner
+   distinguishes it from a patient-derived critical-task card. */
+function renderCreatedTaskCard(t){
+  const dueText = t.dueAt ? new Date(t.dueAt).toLocaleString(undefined,{
+    month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'
+  }) : 'No due date';
+  const linkHref = t.patientId != null ? `inbox.html?patient=${t.patientId}` : 'inbox.html';
+  return `
+    <div class="cust-card calm" data-testid="created-task-card">
+      <div class="cust-head">
+        <div class="cust-head-main">
+          <div class="cust-name">${esc(t.title)}</div>
+          <div class="cust-sub">For ${esc(t.patientName || '—')} · created in Inbox</div>
+        </div>
+        ${t.critical ? '<span class="urgency critical">Critical</span>' : ''}
+      </div>
+      ${t.notes ? `<div class="cust-footer-line">${esc(t.notes)}</div>` : ''}
+      <div class="cust-divider"></div>
+      <div class="cust-footer">
+        <div class="cust-footer-line"><strong>Due</strong> ${esc(dueText)}</div>
+        <div class="cust-footer-line">Assigned to ${esc(t.assignee)}</div>
+      </div>
+      <a class="open-thread-link" href="${linkHref}">
+        Open conversation
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M8 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  `;
+}
+
+function renderCustCard(p){
+  const lvl = urgencyLevel(p);
+  const urg = lvl === 'critical' ? '<span class="urgency critical">Expires soon</span>'
+            : lvl === 'high'     ? '<span class="urgency high">Overdue</span>'
+            : '';
+  const tags = (p.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+  return `
+    <div class="cust-card" data-id="${p.id}" data-testid="cust-card">
+      <div class="cust-head">
+        <div class="cust-head-main">
+          <div class="cust-name">${esc(p.name)}</div>
+          <div class="cust-sub">${esc(p.sub || '')}</div>
+        </div>
+        ${urg}
+      </div>
+      <div class="tag-row">${tags}</div>
+      <div class="fact-row">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2c2 3 4 5 4 8a4 4 0 1 1-8 0c0-3 2-5 4-8z"/></svg>
+        <span class="fact-row-text">${esc(p.procedure)}</span>
+      </div>
+      ${p.conditions ? `
+      <div class="fact-row">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11.2v.1"/></svg>
+        <span class="fact-row-text">${esc(p.conditions)}</span>
+      </div>` : ''}
+      <div class="ch-row">
+        <div class="ch-icons">
+          <span class="ch-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 4.5l6 4 6-4" stroke="currentColor" stroke-width="1.3"/></svg></span>
+          <span class="ch-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 11V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7l-3 2v-2.5A2 2 0 0 1 3 11z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
+          <span class="ch-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l2 3-1.5 1 4 4 1-1.5L12 12s.5-1 0-1.5L10.5 9l-1.5 1-3-3 1-1.5L5.5 4 4 2.5 3 3z" stroke="currentColor" stroke-width="1.3"/></svg></span>
+        </div>
+        <span class="ch-price">${fmtMoney(p.est)}</span>
+      </div>
+      <div class="cust-divider"></div>
+      <div class="cust-footer">
+        ${p.pendingMessageDays != null ? `<div class="cust-footer-line"><strong>Pending message</strong> (${p.pendingMessageDays} days ago)</div>` : ''}
+        ${p.reviewConcerns ? `<div class="cust-footer-line"><strong>Review concern</strong> (+${p.reviewConcerns} tasks)</div>` : ''}
+        ${p.dueDate ? `<div class="cust-footer-line">Due date ${esc(p.dueDate)}</div>` : ''}
+      </div>
+      <a class="open-thread-link" href="inbox.html?patient=${p.id}" onclick="event.stopPropagation()">
+        Open conversation
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M8 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  `;
+}
+
+function renderUnreadRow(p){
+  const src = SOURCES[p.source] || {label:'—'};
+  return `
+    <div class="unread-item" data-id="${p.id}" data-testid="unread-item">
+      <div class="unread-av">${esc(p.initials)}</div>
+      <div class="unread-body">
+        <div class="unread-name">${esc(p.name)}</div>
+        <div class="unread-msg">${esc((p.timeline[p.timeline.length-1]?.body) || p.sub || '')}</div>
+        <div class="unread-meta"><span>${esc(src.label)}</span><span>${fmtAgo(p.lastContactMinutesAgo || p.createdMinutesAgo)} ago</span></div>
+      </div>
+    </div>
+  `;
+}
+
+/* === Render: Tasks view =============================================== */
+
+function renderTasks(){
+  const all = people.map(p => {
+    const tp = buildTouchPoints(p.tpIndex)[p.tpIndex];
+    return tp && tp.actor === 'human' ? {p, tp} : null;
+  }).filter(Boolean);
+
+  const overdue = all.filter(t => isStale(t.p));
+  const today   = all.filter(t => !isStale(t.p) && t.p.lastContactMinutesAgo == null);
+  const week    = all.filter(t => !isStale(t.p) && t.p.lastContactMinutesAgo != null);
+
+  $('tasks-wrap').innerHTML = [
+    section('Overdue — needs attention', overdue, true),
+    section('Today',     today, false),
+    section('This week', week,  false),
+  ].join('') || '<div class="stub"><h3>Inbox zero</h3><p>No tasks waiting on a human right now.</p></div>';
+
+  document.querySelectorAll('#tasks-wrap .task-row').forEach(row => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('.task-act')) return;
+      openDrawer(parseInt(row.dataset.id, 10));
+    });
+  });
+
+  function section(title, list, isOverdue){
+    if (!list.length) return '';
+    return `
+      <div class="tasks-block ${isOverdue?'overdue':''}">
+        <div class="tasks-block-head">
+          <span class="tasks-block-title">${esc(title)}</span>
+          <span class="tasks-block-count">${list.length}</span>
+        </div>
+        ${list.map(t => `
+          <div class="task-row" data-id="${t.p.id}" data-testid="task-row">
+            <div class="task-av">${esc(t.p.initials)}</div>
+            <div class="task-main">
+              <div class="task-name">${esc(t.p.name)}</div>
+              <div class="task-sub">${esc(t.tp.title)} · ${esc(t.p.procedure)}</div>
+            </div>
+            <span class="task-due ${isOverdue?'overdue':''}">${isOverdue ? 'Overdue' : t.tp.target}</span>
+            <div class="task-actions">
+              <button class="task-act primary" onclick="event.stopPropagation();openDrawer(${t.p.id});setPane('suggested')">Call</button>
+              <button class="task-act" onclick="event.stopPropagation();markDone(${t.p.id})">Mark done</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+function markDone(id){
+  const p = people.find(x => x.id === id);
+  if (!p) return;
+  p.tpIndex = Math.min(p.tpIndex + 1, TP_TEMPLATE.length);
+  p.lastContactMinutesAgo = 5;
+  p.contactedByHuman = true;
+  render();
+}
+
+/* === Render: Pipeline view ============================================ */
+
+function renderPipeline(){
+  $('pipeline').innerHTML = STAGES.map(s => {
+    const lane = people.filter(p => p.stage === s.id);
+    return `
+      <div class="lane ${s.id==='cold'?'cold':''}" data-testid="lane-${s.id}">
+        <div class="lane-head">
+          <span class="lane-dot" style="background:${s.text}"></span>
+          <span class="lane-title">${esc(s.label)}</span>
+          <span class="lane-count">${lane.length}</span>
+        </div>
+        <div class="lane-body">
+          ${lane.length === 0 ? '<div class="lane-empty">—</div>' : lane.map(p => `
+            <div class="lane-card" data-id="${p.id}" data-testid="lane-card">
+              <div class="lane-card-top">
+                <div class="lane-card-name">${esc(p.name)}</div>
+              </div>
+              <div class="lane-card-sub">${esc(p.procedure)}</div>
+              <div class="lane-card-foot">
+                <span>${esc(SURGEONS[p.surgeon]?.name || '')}</span>
+                <span>${fmtAgo(p.createdMinutesAgo)} ago</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.querySelectorAll('#pipeline .lane-card').forEach(c => {
+    c.addEventListener('click', () => openDrawer(parseInt(c.dataset.id, 10)));
+  });
+}
+
+/* === Render: Engine view ============================================== */
+
+function renderEngine(){
+  const rows = people.map(p => {
+    const tp = buildTouchPoints(p.tpIndex)[p.tpIndex];
+    return tp ? {p, tp} : null;
+  }).filter(Boolean);
+  const firing  = rows.filter(r => r.tp.status === 'firing');
+  const queued  = rows.filter(r => r.tp.actor === 'human' && r.tp.status === 'due' && !isStale(r.p));
+  const blocked = rows.filter(r => r.tp.actor === 'human' && isStale(r.p));
+
+  const autoTouches = people.reduce((a,p) => a + Math.min(p.tpIndex, 8), 0);
+  const need = queued.length + blocked.length;
+  const pct = (autoTouches + need) ? Math.round(100 * autoTouches / (autoTouches + need)) : 0;
+
+  $('engine-wrap').innerHTML = `
+    <div class="engine-banner">
+      <div class="engine-banner-text">
+        <div class="engine-banner-title">The system is doing the work</div>
+        <div class="engine-banner-sub">The engine handles enquiry, reminder and re-engagement touches automatically. Humans step in for the conversations that need them.</div>
+      </div>
+      <div class="engine-stats">
+        <div><div class="engine-stat-num">${pct}%</div><div class="engine-stat-lbl">Auto-handled</div></div>
+        <div><div class="engine-stat-num">${need}</div><div class="engine-stat-lbl">Need a human</div></div>
+        <div><div class="engine-stat-num">${blocked.length}</div><div class="engine-stat-lbl">Blocked</div></div>
+      </div>
+    </div>
+    ${engineSection('Firing now', firing, 'firing')}
+    ${engineSection('Queued, waiting on a human', queued, 'queued')}
+    ${blocked.length ? engineSection('Blocked, overdue human action', blocked, 'blocked') : ''}
+  `;
+  document.querySelectorAll('#engine-wrap tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => openDrawer(parseInt(tr.dataset.id, 10)));
+  });
+}
+
+function engineSection(title, list, kind){
+  return `
+    <div class="engine-section">
+      <div class="engine-section-head">
+        <span class="engine-section-title">${esc(title)}</span>
+        <span class="engine-section-count">${list.length}</span>
+      </div>
+      ${list.length === 0 ? '<div class="lane-empty">Nothing here.</div>' : `
+        <table class="engine-table">
+          <thead><tr><th>Person</th><th>Touch</th><th>Actor</th><th>Status</th><th>Due</th><th></th></tr></thead>
+          <tbody>${list.map(r => `
+            <tr data-id="${r.p.id}" data-testid="engine-row">
+              <td>${esc(r.p.name)}</td>
+              <td>${esc(String(r.tp.n))} · ${esc(r.tp.title)}</td>
+              <td><span class="actor-chip ${r.tp.actor === 'mixed' ? 'system' : r.tp.actor}">${r.tp.actor === 'mixed' ? 'Mixed' : r.tp.actor === 'system' ? 'System' : 'Human'}</span></td>
+              <td><span class="status-chip ${kind}">${kind === 'firing' ? 'Firing' : kind === 'queued' ? 'Queued' : 'Blocked'}</span></td>
+              <td>${esc(r.tp.target)}</td>
+              <td><button class="engine-mini-btn">Override</button></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `}
+    </div>
+  `;
+}
+
+/* === Render: drawer ================================================== */
+
+let selectedPersonId = null;
+
+function openDrawer(id){
+  selectedPersonId = id;
+  const p = people.find(x => x.id === id);
+  if (!p) return;
+
+  $('d-av').textContent = p.initials;
+  $('d-name').textContent = p.name;
+  const stage = STAGES.find(s => s.id === p.stage);
+  const src = SOURCES[p.source];
+  const surgeon = SURGEONS[p.surgeon];
+  $('d-sub').textContent = `${stage.label} · ${surgeon?.name || ''} · via ${src?.label || ''} · score ${p.leadScore}`;
+  $('d-open-thread').setAttribute('href', `inbox.html?patient=${p.id}`);
+
+  $('kv-details').innerHTML = `
+    <div class="kv-label">Stage</div>   <div class="kv-val">${esc(stage.label)}</div>
+    <div class="kv-label">Procedure</div> <div class="kv-val">${esc(p.procedure)}</div>
+    <div class="kv-label">Surgeon</div> <div class="kv-val">${esc(surgeon?.name || '')}</div>
+    <div class="kv-label">Source</div>  <div class="kv-val">${esc(src?.label || '')}</div>
+    <div class="kv-label">Lead score</div> <div class="kv-val">${p.leadScore}<span class="muted"> / 100</span></div>
+    <div class="kv-label">Touch progress</div> <div class="kv-val">T·${Math.min(p.tpIndex, TP_TEMPLATE.length)} of ${TP_TEMPLATE.length}</div>
+    <div class="kv-label">Lead age</div> <div class="kv-val">${fmtAgo(p.createdMinutesAgo)} ago</div>
+    <div class="kv-label">Last contact</div> <div class="kv-val">${fmtAgo(p.lastContactMinutesAgo)} ago</div>
+  `;
+  $('why-now-text').textContent = p.whyNowText || '—';
+
+  $('tp-list').innerHTML = buildTouchPoints(p.tpIndex).map(tp => {
+    const channels = tp.channel.split(',').map(c => `<span class="tag" style="height:auto;padding:1px 6px;font-size:11px">${esc(c.trim())}</span>`).join(' ');
+    return `
+      <div class="tp-item ${tp.status}">
+        <span class="tp-num">${esc(String(tp.n))}</span>
+        <div class="tp-main">
+          <div><span class="tp-title">${esc(tp.title)}</span><span class="tp-target">· ${esc(tp.target)}</span></div>
+          <div class="tp-desc">${esc(tp.desc)}</div>
+          <div class="tp-tags">
+            <span class="actor-chip ${tp.actor === 'mixed' ? 'system' : tp.actor}">${tp.actor === 'mixed' ? 'Mixed' : tp.actor === 'system' ? 'System' : 'Human'}</span>
+            ${channels}
+          </div>
+        </div>
+        <span class="tp-status ${tp.status}">${tp.status === 'done' ? 'Done' : tp.status === 'firing' ? 'Firing' : tp.status === 'due' ? 'Due now' : 'Pending'}</span>
+      </div>
+    `;
+  }).join('');
+
+  if (p.suggestedAction){
+    const sa = p.suggestedAction;
+    $('sa-mount').innerHTML = `
+      <div class="sa-card">
+        <div class="sa-card-head">
+          <div class="sa-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 5.6L20 9l-4 4 1 6-5-2.8L7 19l1-6-4-4 5.6-1.4z"/></svg>
+          </div>
+          <div>
+            <div class="sa-card-title">Suggested next step</div>
+            <div class="sa-card-sub">AI-drafted · ${esc(sa.channel)} · review before sending</div>
+          </div>
+        </div>
+        <div class="sa-msg-meta">You sign off before this sends.</div>
+        <div class="sa-msg">${esc(sa.draft)}</div>
+        <div class="sa-actions">
+          <button class="qa-btn primary">Send as-is</button>
+          <button class="qa-btn">Edit</button>
+          <button class="qa-btn">Regenerate</button>
+          <button class="qa-btn danger">Skip this touch</button>
+        </div>
+      </div>
+    `;
+    $('sa-reason').textContent = sa.reason;
+  } else {
+    $('sa-mount').innerHTML = '<div class="stub"><p>No suggested action for this person right now.</p></div>';
+    $('sa-reason').textContent = '—';
+  }
+
+  $('timeline').innerHTML = p.timeline.map(t => `
+    <div class="tl-item ${t.kind}">
+      <div class="tl-dot"><svg width="6" height="6" viewBox="0 0 6 6"><circle cx="3" cy="3" r="2" fill="currentColor"/></svg></div>
+      <div class="tl-head">
+        <span class="tl-actor">${esc(t.actor)}</span>
+        <span class="tl-action">${esc(t.what)}</span>
+        <span class="tl-time">${esc(t.when)}</span>
+      </div>
+      ${t.body ? `<div class="${t.body.startsWith('"')?'tl-quote':'tl-body'}">${esc(t.body)}</div>` : ''}
+    </div>
+  `).join('');
+
+  $('drawer').classList.add('open');
+  $('scrim').classList.add('open');
+  $('drawer').setAttribute('aria-hidden','false');
+}
+
+function closeDrawer(){
+  $('drawer').classList.remove('open');
+  $('scrim').classList.remove('open');
+  $('drawer').setAttribute('aria-hidden','true');
+  selectedPersonId = null;
+}
+
+function setPane(p){
+  document.querySelectorAll('.drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.pane === p));
+  document.querySelectorAll('.drawer-pane').forEach(pane => pane.classList.toggle('active', pane.id === 'pane-' + p));
+}
+
+/* markLost removed in the seven-stage pass — no "cold" target. If a
+   parallel "archived" surface is wanted later, do it as a per-person
+   flag, not a stage. */
+
+/* === View switching =================================================== */
+
+let view = 'overview';
+
+function setView(v){
+  view = v;
+  document.querySelectorAll('.rail-item').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  document.querySelectorAll('.view-pane').forEach(s => s.style.display = 'none');
+
+  const titleMap = {
+    overview:'Overview', tasks:'Tasks',
+    pipeline:'Pipeline', engine:'Engine', analytics:'Analytics',
+  };
+  $('page-title').textContent = titleMap[v] || v;
+
+  if (v === 'overview') {
+    $('view-overview').style.display = 'block';
+    renderToday();
+    renderOverview();
+  } else if (v === 'tasks') {
+    $('view-tasks').style.display = 'block';
+    renderTasks();
+  } else if (v === 'pipeline') {
+    $('view-pipeline').style.display = 'block';
+    renderPipeline();
+  } else if (v === 'engine') {
+    $('view-engine').style.display = 'block';
+    renderEngine();
+  } else if (v === 'analytics') {
+    $('view-analytics').style.display = 'block';
+    renderAnalytics();
+  } else {
+    $('view-stub').style.display = 'block';
+    $('stub-title').textContent = `${titleMap[v]} view`;
+    $('stub-body').textContent = `${titleMap[v]} is in the Figma but not in scope yet.`;
+  }
+}
+
+function render(){
+  if      (view === 'overview')  { renderToday(); renderOverview(); }
+  else if (view === 'tasks')     renderTasks();
+  else if (view === 'pipeline')  renderPipeline();
+  else if (view === 'engine')    renderEngine();
+  else if (view === 'analytics') renderAnalytics();
+  /* Always keep the rail Tasks badge fresh — renderToday updates it on
+     Overview, but if the user is on another view we still need a refresh. */
+  if (view !== 'overview') {
+    const tasks = people.filter(p => {
+      const tp = buildTouchPoints(p.tpIndex)[p.tpIndex];
+      return tp && tp.actor === 'human' && tp.status === 'due';
+    });
+    $('rail-tasks-count').textContent = tasks.length;
+  }
+}
+
+/* === Version toast =================================================== */
+
+let toastTimer;
+function showVersion(){
+  $('version-toast-num').textContent = 'v' + VERSION;
+  $('version-toast').classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('version-toast').classList.remove('visible'), 2400);
+}
+
+/* === Boot ============================================================ */
+
+document.addEventListener('DOMContentLoaded', () => {
+  $('version-toast-num').textContent = 'v' + VERSION;
+  render();
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+});
+
+/* === Test surface =====================================================
+   Playwright reaches these via `page.evaluate(() => window.__lms.xxx())`.
+   Keep this minimal — only pure functions and read-only domain constants.
+   ===================================================================== */
+window.__lms = {
+  VERSION,
+  STAGES, SOURCES, SURGEONS, TP_TEMPLATE, PAIN_POINTS,
+  buildTouchPoints,
+  isUrgent, isUncontacted, isStale, urgencyLevel,
+  get people(){ return people; },
+};
+</script>
+</body>
+</html>
