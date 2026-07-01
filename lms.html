@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  adoreal. — Lead Management System (LMS) prototype  ·  v0.24 (2026-07-01)
+
+  v0.24 — Hardened Custom Variables (onboarding · Business details):
+    • Each variable is now a NAME + its {{token}} + a VALUE, read-only by default
+      (no more click-anywhere-to-edit). The {{token}} is shown so you know exactly
+      what to drop into a template.
+    • A ⋯ menu per row with real actions: Edit, Copy token, Copy value, Delete.
+      Editing happens via the menu (inline name/value inputs + Save/Cancel), not by
+      clicking the field; saving shows a confirmation (toast + a "✓ Saved" flash).
+    • "Add another field" opens a new row straight into edit mode.
+
+  v0.23 — Deeper threads on the top leads (demo richness):
+    • Thread depth now scales with list position: the top lead carries ~25
+      messages, the next ~15, the rest of the top 5 >10, then tapering to
+      single-message new enquiries further down. (buildSeed assigns lead.threadLen
+      by initial sort rank; fullThread() builds a two-way conversation of that
+      length for uncontacted people, always ending on their unanswered inbound.)
+    • Leads with a real history get a contextual REPLY draft (+ "Send reply"),
+      not a first-outreach — so the composer matches the conversation above it.
+
+  v0.22 — Coordinator composer shows the thread + verified review fixes:
+    • The message/send section (right pane) now ALWAYS shows the person's thread,
+      including the AUTO-SELECTED uncontacted lead — their unanswered incoming
+      message(s) sit above the composer (most recent at the bottom), scroll up
+      loads 5 more. (fullThread() now returns an inbound-led thread for
+      uncontacted people; thread shown for every coordinator lead.)
+    • Fixed the price/header misalignment at the root: the whole header row was
+      offset because .leads-head had padding-left:20px vs .lead-row's 0 — now the
+      header grid shares the row's origin and every column header sits above its
+      cell (Waiting label inset 16px to match the timer).
+    • Verified-review fixes: composer note no longer contradicts the channel
+      ("No SMS consent — reaching out on Instagram instead"); no dead "Call now"
+      when there's no phone (shows a "no reachable channel" note); contacted-row
+      timers refresh on the live tick; contacted leads sort by most-recent contact;
+      detail "Waiting" reads "Last contact" for contacted; composer foot wraps
+      instead of clipping in the narrow pane. Thread header channel matches the
+      composer channel. 58 Playwright tests.
+
+  v0.21 — Onboarding role = the clinic SETUP console (role-based in production):
+    Switching to the Onboarding role now shows a configuration surface instead of
+    the leads list, with a left sub-nav and four sections:
+      • Business details — custom variables (business name, phone, booking URL,
+        homepage, about, testimonials + add-your-own), opening hours (per-day
+        open/closed toggles + from/to), brand primary colour, default currency.
+      • Email & domains — verify-your-domain + benefits, domain list with green
+        "Verified" badges AND one "Verifying DNS…" in progress, sender emails.
+      • Automations — the "Automate repetitive things" engine (Incoming +
+        Contact points 1–3 / 4–5, live + run counts, edit/toggle/overflow). The
+        acknowledgement email expands to an INLINE editable subject+body with
+        "Save for review" (audit gate), plus A/B VARIANTS comparing deliverability
+        % + click-through % so you can tune what lands.
+      • Lead channels — connect cards for Instagram, Facebook Pages, Facebook Lead
+        Ads, WhatsApp, Website chatbot (connected vs Connect).
+    Also: currency is now USD ($) throughout — Belcara Health is US-based, matching
+    the setup's default-currency (was GBP). New onboarding.spec.ts (6 tests); 56 total.
+
+  v0.20 — Detail-pane conversation + channel selector + procedure filter:
+    • Conversation is scroll-to-load: shows the most recent messages and pages in
+      OLDER ones on scroll-up (or a "Load earlier messages" button). Dropped the
+      prominent "Open full conversation" button — the in-pane scroll is the way;
+      a subtle "Open in inbox ↗" stays in the thread header.
+    • WHY this action: every recommendation is grounded in the person's most
+      recent message — the reply composer shows "Replying to <name>: <last msg>",
+      and the task card shows the quoted last message + a one-line rationale.
+    • Channel selector copied from inbox.html: the "Sending via X" label is gone;
+      it's now a pill + caret you click to pick the transport (chan-selector /
+      compose-chan / chan-dropdown). The composer channel is always a REACHABLE
+      one (a no-consent WhatsApp preference clamps to email/DM).
+    • New PROCEDURE filter (multi-interest aware) alongside urgency/status/source.
+
+  v0.19 — Stage-chip consistency with the canonical 7-stage table:
+    • Stage chips now match the canonical table EXACTLY (background + text) and
+      are byte-identical to inbox.html — dropped the extra same-hue border so
+      there's no styling beyond the spec (Discover→Long-term; all pairs AA).
+    • Used the stage MEANINGS to fix two data inconsistencies: (1) an uncontacted
+      person is always Discover ("first interest, before consultation") and a
+      late-stage chip (Pre-op→Long-term) never appears on a hot uncontacted row
+      — Charlotte (Recover) is now a contacted, established patient, not a 2-min
+      hot lead; (2) nextPatientTask() no longer offers "Book consultation" /
+      "Send health declaration" to Pre-op-onward people (that's behind them).
+
+  v0.18 — Scrollable thread + multiple interests (founder feedback on v0.17):
+    • The conversation is now the CENTREPIECE of the detail pane: a tall,
+      scrollable history (oldest→newest) that LAZY-LOADS older messages as the
+      coordinator scrolls up — so they can read the whole exchange inline and
+      rarely need to open the inbox. The thread mixes patient/clinic messages
+      with logged calls + system touch-points ("Called — no answer, left
+      voicemail", "Day-3 nudge sent"), like the live thread. (fullThread() +
+      wireThreadScroll(); "Open full conversation →" is now a convenience.)
+    • People can enquire about MULTIPLE procedures — ~18% now carry 2–3 interests
+      (e.g. tummy tuck + breast augmentation). The Interest column shows the
+      primary + a "+N" badge; the detail pane lists them all. (interests[] /
+      interestsOf(); interest stays the primary for filters + copy.)
+    • Honouring "users don't move leads → the data goes stale": stage stays
+      system-derived (never a manual drag).
+    • Leaner list: dropped the Status column ("Uncontacted" on every visible row)
+      and the per-row Reply link (identical on every row; the row click already
+      opens the reply pane). Columns are now Waiting · Person · Stage · Interest ·
+      Value · Suggested action · ›.
+    • Per-lead ESTIMATED VALUE (£, summed across the person's procedures) in the
+      list + detail, so high-value enquiries stand out. (PROCEDURE_VALUE.)
+    • Pain-points dimension pending — David is sending Johan's 13.
+
+  v0.17 — Thread context + patient-journey tasks (founder feedback on v0.16):
+    • The detail pane now shows the **recent conversation** (the last ~4–6
+      messages) for anyone already engaged, so you have context before acting —
+      then the prominent "Open full conversation →" hands off to the unified
+      inbox for the full thread. (buildThread() synthesises a preview whose
+      ending lines up with the recommended next step.)
+    • Recommended next actions are no longer only message/call. Engaged people
+      now surface **patient-journey TASKS** matched to where they are: **Book
+      consultation**, **Send health declaration**, **Share Silhouette
+      simulation** (nextPatientTask()). They render as a task card with a 1-click
+      action that advances the journey one step; the row shows a quiet task hint.
+    • Uncontacted people are unchanged: speed-to-lead, messaging-first composer.
+
+  v0.16 — Column tuning on the leads list (founder feedback on v0.15):
+    • Kept Waiting + urgency. The urgency timer now "pops" (flashes darker red
+      + a quick scale for ~1s) each time a hot/cooling lead's displayed minute
+      ticks over, so the eye catches the clock moving in realtime.
+    • Dropped the "Person" column label (the column stays; the header word went).
+    • Removed Source from the list — it now lives only in the detail pane on the
+      right ("it shows on the right which is enough").
+    • Replaced Source with STAGE, rendered with the exact inbox stage chips
+      (Discover→Long-term, same colours as inbox.html). Lead stages now use the
+      same 7-stage vocabulary as the inbox; the 9 featured leads carry the stage
+      their inbox thread shows.
+
+  v0.15 — Master/detail + 1-click messaging (founder feedback on v0.14):
+    • Two-pane layout: list (left, top ~6 above the fold) + a detail pane
+      (right) that's ALWAYS visible on desktop. The top/most-urgent lead is
+      AUTO-SELECTED on landing and clearly highlighted; clicking any row
+      re-selects. On mobile the pane is a slide-over sheet.
+    • The detail pane carries a 1-CLICK COMPOSER: a generated, editable
+      message in the smart channel for that lead, a channel switcher, and a
+      prominent Send. Sending marks the lead in-conversation, toasts, and (on
+      desktop) auto-advances to the next lead who needs a human — a fast
+      speed-to-lead loop.
+    • Messaging-first suggestions. suggestedChannel() picks the channel by
+      SOURCE (Instagram→IG, web→email, phone→call…), so most leads now get a
+      message suggestion, not "Call now". Calls are the minority. SMS/WhatsApp
+      stay consent-gated (Belcara P0); IG/FB DMs don't need SMS consent.
+    • Row action is now a QUIET hint (channel name + icon), not a black button
+      on every line — the prominent action lives in the detail pane only.
+
+  v0.14 — TRANSFORMATIONAL PIVOT (founder feedback). Full rewrite.
+
+  The founder killed the multi-view LMS: "altogether too much going on...
+  pipeline, analytics, engine — it's bullshit. a powerpoint, not a useful
+  tool. let's focus on one view." v0.14 is ONE focused surface:
+
+    A live speed-to-lead leads list. Thousands of people-before-patients,
+    paginated, with the longest-waiting actionable lead loud at the top and
+    a clock ticking on every uncontacted row. New leads stream in while you
+    watch. Dirty data is shown honestly. Three roles read more/less detail
+    off the SAME rows.
+
+  Designed via a 4-lens design panel (urgency / dirty-data / roles / focus)
+  + synthesis. Blueprint stored in the workflow transcript.
+
+  KILLED: left rail + 5 views (Overview/Tasks/Pipeline/Engine/Analytics),
+  kanban, analytics mockups, KPI deck, today-strip.
+  KEPT verbatim: top bar, mobile product-nav, pending-tasks dropdown,
+  version-gear toast, inbox.html handoff (?patient=&chan=/&action=log-call).
+
+  CORE MECHANICS
+    • Urgency tiers from (now − arrivedAt), uncontacted only:
+        Hot 0–5m (--red, ticks m+s) · Cooling 5–60m (--yellow) ·
+        Slow 1–24h (--p5) · Stale >24h (--g6, muted) · Contacted (--green, calm)
+      Full-saturation colour touches ONLY the 4px gutter edge + timer chip.
+    • Sort = most urgent first (tier rank, then longest-waiting within tier).
+      Deliberate deviation from the panel's "longest waiting" label: a 3-day
+      stale lead is re-engagement, not speed-to-lead. Hottest = row 1.
+    • ~2,400 seeded leads (deterministic via mulberry32) + realtime arrivals.
+      Only the current page (50/row default) is in the DOM — performance.
+    • ~20% dirty data: missing/handle names, partial phones, bounced/missing
+      email, dupes, no-SMS-consent (Belcara P0), vague interest, unknown
+      source, spam. Shown as quiet --g6 signals; red is reserved for urgency.
+    • suggestedAction(lead, role) is a pure function that degrades on dirty
+      data (no phone → no "Call now"; no consent → never SMS) and switches
+      verbs by role.
+
+  ROLES (JS switch, single file, no routing; preserves scroll/filter/page;
+  persisted to localStorage):
+    • Patient Coordinator (default, protected, lean) — speed-to-lead cockpit.
+    • Onboarding Specialist — +Stage +Setup cells, conversion verbs.
+    • Adoreal Support — +Engine cell, delivery log + template-safety flags
+      in the drawer ("what went wrong"); read-only.
+
+  REALTIME + TESTS
+    • Two intervals: 1s timer tick (updates visible chips only) + jittered
+      arrival loop (first ~5s, opening burst, then backs off).
+    • window.__lms.freezeForTest() pins the clock + stops both intervals so
+      Playwright visual baselines are deterministic. Pure functions exposed
+      for unit tests.
+
+  Three version-string locations — bump all three each iteration:
+    1. Header comment block (this section).
+    2. meta tag: adoreal-prototype-version content
+    3. <title> with matching · v0.N
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="adoreal-prototype-version" content="0.24"/>
+<title>adoreal. — Lead Management System · v0.24</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Mulish:wght@400;500;600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Design tokens — Figma z2DZzndHRpA5lEG6gHGGdD (see memory) ── */
+:root{
+  --black:#342F2C; --white:#FFFFFF; --bg:#FEF7F5;
+  --nude:#965E47; --nude-pink:#E1A991; --brown:#B1785F; --pink-medium:#F4E7E3;
+  --p2:#F4E7E3; --p3:#EFDCD7; --p4:#E7CDC6; --p5:#DFBBB1;
+  --g1:#FFFFFF; --g2:#F9F9F9; --g3:#EBEAEA; --g4:#D3D3D3; --g5:#BDBDBD; --g6:#787878; --g7:#6D635D; --g8:#342F2C;
+  --text-primary:#202020; --divider:#EBEAEA;
+  --red:#CB4137; --red-soft:rgba(203,65,55,.5); --red-wash:rgba(203,65,55,.06);
+  --yellow:#F4C569; --yellow-soft:rgba(244,197,105,.5);
+  --green:#7AC558; --green-soft:rgba(122,197,88,.5);
+  --blue:#5A8DB8; --blue-soft:rgba(90,141,184,.18);
+  --r4:4px; --r8:8px; --r12:12px; --r20:20px;
+}
+html,body{height:100%;font-family:'Proxima Nova','Mulish','Nunito Sans','Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--black);font-size:14px;line-height:1.4;overflow:hidden}
+
+/* ══════════════ TOP BAR (verbatim from the canonical shell) ══════════════ */
+.aos-topbar{display:flex;align-items:center;gap:32px;padding:0 28px;height:64px;background:var(--white);border-bottom:1px solid var(--p4);flex-shrink:0;position:relative;z-index:50;transition:padding .25s ease,height .25s ease,gap .25s ease}
+.aos-wordmark{font-family:'DM Serif Display',Georgia,serif;font-size:24px;color:var(--black);letter-spacing:-.3px;line-height:1;flex-shrink:0;transition:font-size .25s ease}
+.aos-search{flex:0 0 320px;max-width:320px;position:relative;display:flex;align-items:center}
+.aos-search-icon{position:absolute;left:14px;color:var(--g6);pointer-events:none;display:flex}
+.aos-search input{width:100%;height:38px;border:1.5px solid var(--p4);border-radius:var(--r20);background:var(--white);padding:0 14px 0 38px;font-size:13px;color:var(--black);font-family:inherit;outline:none;transition:border-color .15s}
+.aos-search input::placeholder{color:var(--g6)}
+.aos-nav{display:flex;align-items:center;gap:28px;flex:1;height:100%}
+.aos-nav-item{font-size:14px;color:var(--g7);font-weight:300;cursor:default;padding:6px 0;transition:color .15s;letter-spacing:.1px;display:inline-flex;align-items:center;gap:6px;line-height:1;height:100%;text-decoration:none}
+.aos-nav-item[href]{cursor:pointer}
+@media (hover: hover) { .aos-nav-item:hover{color:var(--black)} }
+.aos-nav-item.active{color:var(--nude);font-weight:400}
+.aos-right{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.aos-icon-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--p4);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--g7);transition:all .15s;font-family:inherit}
+@media (hover: hover) { .aos-icon-btn:hover{background:var(--bg);color:var(--black)} }
+.version-toast-anchor{position:relative;display:flex;align-items:center}
+.version-toast{position:absolute;top:calc(100% + 8px);right:0;background:var(--white);border:1px solid var(--p4);border-radius:12px;padding:8px 14px;box-shadow:0 6px 20px rgba(52,47,44,.12);display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap;opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .15s,transform .15s;z-index:1000}
+.version-toast.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+.version-toast-label{color:var(--g7);font-weight:500}
+.version-toast-num{color:var(--brown);font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width: 1024px) { .version-toast{display:none} }
+.aos-user{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px 4px 4px;border-radius:var(--r20);transition:background .15s}
+@media (hover: hover) { .aos-user:hover{background:var(--bg)} }
+.aos-user-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--brown),var(--nude));color:var(--white);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.aos-user-name{font-size:13px;color:var(--black);font-weight:500}
+.aos-user-caret{color:var(--g7);display:flex}
+@media (max-width:1024px) {
+  .aos-topbar{padding:0 14px;gap:12px;height:56px;transition:padding .25s ease,height .25s ease}
+  .aos-wordmark{font-size:22px}
+  .aos-search,.aos-nav{display:none}
+  .aos-user-name{display:none}
+  .aos-right{margin-left:auto}
+}
+
+/* Pending-tasks dropdown (verbatim) */
+.pending-anchor{position:relative;display:flex;align-items:center}
+.pending-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--yellow);border:2px solid var(--white);display:none}
+.pending-dot.has-pending{display:block}
+.pending-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:260px;background:var(--white);border:1px solid var(--p4);border-radius:var(--r8);box-shadow:0 6px 24px rgba(52,47,44,.12);padding:8px;z-index:300;display:none}
+.pending-menu.open{display:block}
+.pending-menu-head{padding:8px 10px 10px;border-bottom:1px solid var(--g3);margin-bottom:6px}
+.pending-menu-title{font-size:14px;font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.pending-menu-overdue{font-size:12px;color:var(--g7);margin-top:2px;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:5px}
+.pending-menu-overdue::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--yellow)}
+.pending-menu-action{display:block;width:100%;text-align:left;padding:9px 10px;border:0;border-radius:var(--r4);background:transparent;cursor:pointer;font-family:inherit;font-size:13px;color:var(--text-primary)}
+.pending-menu-action:hover{background:var(--bg)}
+
+/* ══════════════ SHELL — single column, no rail ══════════════ */
+.shell{height:calc(100vh - 64px);overflow:hidden;display:flex;flex-direction:column}
+@media (max-width:1024px){ .shell{height:calc(100vh - 56px)} }
+.main{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px 32px 0;overflow:hidden}
+@media (max-width:820px){ .main{padding:14px 14px 0} }
+
+/* ── Context strip — one calm line + role switcher ── */
+.context-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:14px}
+.context-summary{font-size:14px;color:var(--g7);line-height:1.5}
+.context-summary .cs-strong{color:var(--text-primary);font-weight:600}
+.context-summary .cs-now{color:var(--red);font-weight:600}
+.context-summary .cs-sep{color:var(--g4);margin:0 7px}
+.role-switcher{display:inline-flex;background:var(--g2);border-radius:var(--r20);padding:3px;flex-shrink:0}
+.role-option{height:30px;padding:0 14px;border:0;background:transparent;border-radius:var(--r20);font-family:inherit;font-size:13px;font-weight:500;color:var(--g7);cursor:pointer;transition:all .15s;white-space:nowrap}
+.role-option.active{background:var(--white);color:var(--black);box-shadow:0 1px 2px rgba(52,47,44,.08)}
+@media (max-width:560px){ .role-option{padding:0 10px;font-size:12px} }
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:12px}
+.filter-search{position:relative;flex:0 0 280px;max-width:280px;display:flex;align-items:center}
+.filter-search svg{position:absolute;left:13px;color:var(--g6);pointer-events:none}
+.filter-search input{width:100%;height:40px;border:1px solid var(--p4);border-radius:var(--r12);background:var(--white);padding:0 12px 0 36px;font-size:14px;color:var(--black);font-family:inherit;outline:none;transition:border-color .15s}
+.filter-search input:focus{border-color:var(--nude)}
+.filter-search input::placeholder{color:var(--g6)}
+.filter-pill{height:40px;padding:0 14px;border:1px solid var(--p4);border-radius:var(--r20);background:var(--white);font-family:inherit;font-size:13px;color:var(--g7);cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;transition:all .15s}
+.filter-pill:hover{background:var(--p2)}
+.filter-pill.active{background:var(--pink-medium);color:var(--black);border-color:var(--p4);font-weight:500}
+.filter-pill .fp-clear{display:inline-flex;color:var(--g6)}
+.filter-pill select{appearance:none;-webkit-appearance:none;background:transparent;border:0;font-family:inherit;font-size:13px;color:inherit;cursor:pointer;outline:none;padding-right:2px}
+.filter-spacer{flex:1}
+.filter-clear{font-size:13px;color:var(--nude);background:none;border:0;cursor:pointer;font-family:inherit;padding:0 6px}
+.filter-clear:hover{text-decoration:underline}
+.realtime-toggle{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 12px;border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--g7);cursor:pointer;white-space:nowrap}
+.realtime-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+.realtime-toggle.live .realtime-dot{animation:rtpulse 2s ease-in-out infinite}
+.realtime-toggle.paused .realtime-dot{background:var(--g5);animation:none}
+@keyframes rtpulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){ .realtime-toggle.live .realtime-dot{animation:none} }
+@media (max-width:820px){ .filter-search{flex-basis:100%;max-width:none} }
+
+/* ── New-leads pill (realtime, when not at top of page 1) ── */
+.new-leads-pill{align-self:center;margin:0 auto 10px;padding:7px 16px;border-radius:var(--r20);border:1px solid var(--p4);background:var(--white);box-shadow:0 4px 14px rgba(52,47,44,.10);font-size:13px;font-weight:600;color:var(--nude);cursor:pointer;display:none;align-items:center;gap:6px}
+.new-leads-pill.show{display:inline-flex}
+
+/* ══════════════ LEADS LIST ══════════════ */
+/* v0.15 — master/detail work area: list column + detail pane side by side */
+.work-area{flex:1;min-height:0;display:flex;gap:16px}
+.leads-col{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.leads-wrap{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--white);border:1px solid var(--p4);border-radius:var(--r8);overflow:hidden}
+/* Header grid must share the ROW's left origin (padding-left:0) so every column
+   header sits directly above its cell; the first label is inset 16px to match
+   the timer's gutter inset. (Fixes a whole-header-row rightward drift.) */
+.leads-head{display:grid;grid-template-columns:var(--cols);align-items:center;gap:12px;padding:11px 16px 11px 0;border-bottom:1px solid var(--g3);background:var(--g2);flex-shrink:0}
+.leads-head span{font-size:12px;font-weight:600;color:var(--g6);letter-spacing:.2px}
+.leads-head > span:first-child{padding-left:16px}
+.leads-head .lh-right{display:block;text-align:right}
+.leads-body{flex:1;min-height:0;overflow-y:auto}
+.leads-body::-webkit-scrollbar{width:8px}
+.leads-body::-webkit-scrollbar-thumb{background:var(--g3);border-radius:4px}
+
+/* row: column set is driven by --cols which setRole() swaps */
+.lead-row{display:grid;grid-template-columns:var(--cols);align-items:center;gap:12px;padding:0 16px 0 0;border-bottom:1px solid var(--g3);background:var(--white);cursor:pointer;position:relative;min-height:64px;transition:background .12s}
+.lead-row:hover{background:var(--p2)}
+.lead-row:last-child{border-bottom:0}
+/* selected row — clearly highlighted; this lead is shown in the detail pane */
+.lead-row.selected{background:var(--p2)}
+.lead-row.selected::after{content:"";position:absolute;right:0;top:0;bottom:0;width:3px;background:var(--nude)}
+
+/* (1) urgency gutter + timer */
+.lead-gutter{align-self:stretch;display:flex;align-items:center;gap:11px;padding-left:16px;position:relative}
+.lead-gutter::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent}
+.lead-row[data-urgency="hot"]    .lead-gutter::before{background:var(--red)}
+.lead-row[data-urgency="cooling"].lead-gutter::before,
+.lead-row[data-urgency="cooling"] .lead-gutter::before{background:var(--yellow)}
+.lead-row[data-urgency="slow"]   .lead-gutter::before{background:var(--p5)}
+.lead-row[data-urgency="stale"]  .lead-gutter::before{background:var(--g5)}
+.lead-row[data-urgency="hot"]{background:var(--red-wash)}
+.lead-row[data-urgency="hot"]:hover{background:rgba(203,65,55,.10)}
+@media (prefers-reduced-motion: no-preference){
+  .lead-row[data-urgency="hot"] .lead-gutter::before{animation:gutterpulse 2s ease-in-out infinite}
+}
+@keyframes gutterpulse{0%,100%{opacity:1}50%{opacity:.55}}
+.lead-timer{min-width:54px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--g6);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+/* Hot timer chip: white text on solid --red so it's the loudest readable
+   element in the row. (Was two conflicting rules → red-on-red, unreadable.) */
+.lead-row[data-urgency="hot"] .lead-timer{background:var(--red);color:#fff;font-weight:700;padding:2px 7px;border-radius:var(--r4)}
+.lead-row[data-urgency="stale"] .lead-timer{color:var(--g6)}
+.lead-timer.contacted{color:#3D8B27;font-weight:500}
+.lead-timer.contacted svg{color:var(--green)}
+/* per-minute "pop": when a hot/cooling lead's displayed minute ticks over, the
+   timer flashes a darker red and scales for ~1s so it visibly catches the eye
+   (founder request). Hot already shows a red chip → it darkens; cooling is plain
+   grey text → it briefly flushes red. tick() toggles .pop, removed after 1s. */
+@media (prefers-reduced-motion: no-preference){
+  .lead-timer.pop{animation:timerpop 1s ease-out}
+  .lead-row[data-urgency="hot"] .lead-timer.pop{animation:timerpop-hot 1s ease-out}
+}
+@keyframes timerpop{0%{}14%{color:#9E261C;transform:scale(1.2)}100%{}}
+@keyframes timerpop-hot{0%{}14%{background:#7E1D15;transform:scale(1.14);box-shadow:0 0 0 3px rgba(203,65,55,.32)}100%{}}
+
+/* (2) person */
+.lead-person{display:flex;align-items:center;gap:10px;min-width:0}
+.lead-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brown),var(--nude));color:var(--white);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lead-av.dim{background:var(--g4)}
+.lead-person-main{min-width:0;display:flex;flex-direction:column;gap:1px}
+.lead-name{font-size:14px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lead-name.dirty{color:var(--g7);font-style:italic;font-weight:500}
+.lead-sub{font-size:12px;color:var(--g7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+/* dirty-data signals stay grey — red is reserved for urgency, never data quality */
+.lead-sub .bounce-dot{width:6px;height:6px;border-radius:50%;background:var(--g5);flex-shrink:0}
+.lead-defect{font-size:11px;color:var(--g6)}
+.lead-defect-chip{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:var(--r4);font-size:10px;font-weight:600;background:var(--g2);color:var(--g6);border:1px solid var(--g3);white-space:nowrap}
+.lead-defect-chip.consent{background:var(--g2);color:var(--g6);border-color:var(--g3)}
+.lead-defect-chip.dupe{background:var(--blue-soft);color:#2A5F88;border-color:transparent}
+
+/* (3) source + (4) interest + (5) status tags */
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r4);font-size:11px;font-weight:500;line-height:1;white-space:nowrap}
+.tag-source{background:var(--p2);color:var(--nude)}
+.tag-source.unknown{background:var(--g2);color:var(--g6)}
+.lead-interest{font-size:13px;color:var(--g7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lead-interest.blank{color:var(--g5)}
+.lead-value{font-size:13px;color:var(--text-primary);font-weight:500;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lead-value.none{color:var(--g5);font-weight:400}
+.tag-status{background:var(--g2);color:var(--g7);border:1px solid var(--g3)}
+/* stage chip — mirrors the inbox stage palette exactly (Discover→Long-term) so a
+   lead's stage reads identically here and in inbox.html, which this view links to. */
+/* Canonical 7-stage palette — background + text are the EXACT values from the
+   stage table (identical to inbox.html's .sp-* pills). No border: matches the
+   table + the inbox's borderless Tag Pill spec. All pairs meet WCAG AA. */
+.stage-chip{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:var(--r4);font-size:11px;font-weight:600;line-height:1;white-space:nowrap}
+.stage-chip.sp-discover{background:#FEF8E7;color:#7A5C00}
+.stage-chip.sp-consult {background:#6CC9D2;color:#0D4A52}
+.stage-chip.sp-decide  {background:#C4B6FF;color:#3A2B7A}
+.stage-chip.sp-preop   {background:#FFA96C;color:#6E3300}
+.stage-chip.sp-surgery {background:#F4A6B0;color:#7A1F2C}
+.stage-chip.sp-recover {background:#F8B8D0;color:#7A2244}
+.stage-chip.sp-longterm{background:#B8E0C8;color:#22542F}
+
+/* (6) suggested action — v0.15: in the ROW this is now a QUIET hint, not a
+   black button on every line (the founder's "too many Call now" note). The
+   prominent Send lives in the detail pane for the selected lead only. */
+.lead-action{display:flex;justify-content:flex-start}
+.sa-hint{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--g7);white-space:nowrap}
+.sa-hint .sa-ico{color:var(--nude);display:inline-flex}
+.sa-hint.call .sa-ico{color:var(--blue)}
+.sa-hint.muted{color:var(--g5)}
+.sa-hint.muted .sa-ico{color:var(--g5)}
+/* .sa-btn is the prominent action — used only in the detail pane composer */
+.sa-btn{height:30px;padding:0 13px;border-radius:var(--r20);border:1px solid var(--black);background:var(--black);color:var(--white);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.sa-btn:hover{background:var(--nude);border-color:var(--nude)}
+.sa-btn.ghost{background:transparent;color:var(--g7);border-color:var(--p4)}
+.sa-btn.ghost:hover{background:var(--p2);color:var(--black)}
+.sa-wait{font-size:12px;color:var(--g6);white-space:nowrap}
+.sa-disabled{font-size:12px;color:var(--g5);white-space:nowrap;font-style:italic}
+
+/* (right) reply + overflow */
+.lead-end{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.lead-reply{font-size:13px;color:var(--black);text-decoration:none;white-space:nowrap}
+.lead-reply:hover{color:var(--nude);text-decoration:underline}
+.lead-reply.disabled{color:var(--g5);pointer-events:none}
+.lead-more{width:26px;height:26px;border-radius:50%;border:0;background:transparent;color:var(--g6);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.lead-more:hover{background:var(--g2);color:var(--black)}
+
+/* Stage now shows in every role (it replaced Source). Setup/engine stay role-only. */
+.lead-stage{display:flex;align-items:center}
+.lead-setup,.lead-engine{display:none}
+body[data-role="onboarding"] .lead-setup{display:flex;align-items:center}
+body[data-role="support"] .lead-engine{display:flex;align-items:center;min-width:0;overflow:hidden}
+.lead-setup{gap:4px}
+.setup-dot{width:8px;height:8px;border-radius:50%;background:var(--g3)}
+.setup-dot.on{background:var(--green)}
+.engine-state{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--g7);min-width:0;max-width:100%}
+.engine-state .es-dot{width:7px;height:7px;border-radius:50%;background:var(--g4);flex-shrink:0}
+.engine-state .es-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.engine-state.done .es-dot{background:var(--green)}
+.engine-state.failed{color:var(--red)} .engine-state.failed .es-dot{background:var(--red)}
+.engine-state.blocked .es-dot{background:var(--yellow)}
+.engine-state.firing .es-dot{background:var(--green);animation:rtpulse 1.4s ease infinite}
+
+/* ── pagination ── */
+.pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 4px 16px;flex-shrink:0}
+.pagination-summary{font-size:13px;color:var(--g7);font-variant-numeric:tabular-nums}
+.pagination-controls{display:flex;align-items:center;gap:6px}
+.pg-btn{min-width:32px;height:32px;padding:0 8px;border:1px solid var(--p4);border-radius:var(--r8);background:var(--white);font-family:inherit;font-size:13px;color:var(--text-primary);cursor:pointer;font-variant-numeric:tabular-nums}
+.pg-btn:hover:not(:disabled){background:var(--p2)}
+.pg-btn.active{background:var(--pink-medium);font-weight:600;border-color:var(--p4)}
+.pg-btn:disabled{color:var(--g5);cursor:default}
+.pg-ellipsis{color:var(--g5);padding:0 2px}
+.pg-size{height:32px;border:1px solid var(--p4);border-radius:var(--r8);background:var(--white);font-family:inherit;font-size:13px;color:var(--text-primary);padding:0 6px;cursor:pointer}
+
+/* ── detail pane — v0.15
+   Desktop (≥1024px): a static right column inside .work-area, always
+   visible, showing the selected lead + the 1-click composer.
+   Mobile (<1024px): a slide-over sheet (the old peek-drawer behaviour). */
+.detail-scrim{position:fixed;inset:0;background:rgba(52,47,44,.35);z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
+.detail-scrim.open{opacity:1;pointer-events:auto}
+.detail-pane{
+  flex:0 0 380px; align-self:stretch;
+  background:var(--white);border:1px solid var(--p4);border-radius:var(--r8);
+  display:flex;flex-direction:column;overflow:hidden;min-height:0;
+}
+.detail-head{padding:18px 20px;border-bottom:1px solid var(--g3);display:flex;align-items:flex-start;gap:12px;flex-shrink:0}
+.drawer-av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--brown),var(--nude));color:var(--white);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.drawer-head-main{flex:1;min-width:0}
+.drawer-name{font-size:17px;font-weight:700;color:var(--text-primary);line-height:1.2}
+.drawer-sub{font-size:13px;color:var(--g7);margin-top:3px}
+.drawer-close{width:30px;height:30px;border-radius:50%;border:1px solid var(--p4);background:var(--white);cursor:pointer;display:none;align-items:center;justify-content:center;color:var(--g7);flex-shrink:0}
+.drawer-close:hover{background:var(--p2);color:var(--black)}
+.detail-body{flex:1;overflow-y:auto;padding:18px 20px}
+.detail-empty{padding:40px 20px;text-align:center;color:var(--g6);font-size:13px}
+@media (max-width:1023px){
+  .work-area{display:block}                     /* list goes full width */
+  .detail-pane{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);border-radius:0;border:0;border-left:1px solid var(--p4);transform:translateX(100%);transition:transform .25s ease;box-shadow:-8px 0 30px rgba(52,47,44,.10);z-index:201}
+  .detail-pane.open{transform:translateX(0)}
+  .drawer-close{display:flex}
+}
+.drawer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+
+/* ── 1-click composer (the crucial bit) ── */
+.composer{border:1px solid var(--p4);border-radius:var(--r8);overflow:visible;margin-bottom:18px;position:relative;background:var(--white)}
+.composer > textarea:first-child{border-radius:var(--r8) var(--r8) 0 0}
+/* "Replying to …" — the most recent inbound message, so it's clear what we're answering */
+.reply-to{font-size:12px;color:var(--g7);padding:9px 12px;background:var(--g2);border-bottom:1px solid var(--g3);border-radius:var(--r8) var(--r8) 0 0;line-height:1.45}
+.reply-to strong{color:var(--text-primary);font-weight:600}
+.composer textarea{width:100%;border:0;outline:0;resize:none;font-family:inherit;font-size:14px;line-height:1.55;color:var(--text-primary);padding:12px;min-height:96px;background:var(--white)}
+.composer-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;row-gap:8px;padding:10px 12px;border-top:1px solid var(--g3);border-radius:0 0 var(--r8) var(--r8);background:var(--white)}
+/* ── channel selector (pill + caret dropdown) — copied from inbox.html's compose-chan ── */
+.chan-selector{position:relative;display:inline-flex;flex-shrink:0}
+.compose-chan{display:inline-flex;align-items:center;gap:7px;padding:0 11px;height:34px;border-radius:var(--r20);font-size:13px;cursor:pointer;border:1px solid var(--p4);font-family:inherit;background:var(--white);color:var(--black);transition:background .15s,border-color .15s;user-select:none}
+.compose-chan:hover{background:var(--p2);border-color:var(--nude)}
+.compose-chan .chevron{transition:transform .15s;display:inline-flex;color:var(--g7)}
+.compose-chan.open .chevron{transform:rotate(180deg)}
+.chan-dropdown{display:none;position:absolute;bottom:calc(100% + 6px);left:0;min-width:240px;background:var(--white);border:1px solid var(--p4);border-radius:var(--r8);box-shadow:0 -4px 18px rgba(52,47,44,.16);z-index:1000;overflow:hidden}
+.chan-dropdown.open{display:block}
+.chan-dd-label{padding:9px 12px 4px;font-size:11px;color:var(--g7)}
+.chan-dd-item{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;font-size:13px;color:var(--black);transition:background .12s}
+.chan-dd-item:hover{background:var(--p2)}
+.chan-dd-item.active{background:var(--p2);font-weight:600}
+.chan-dd-item .dd-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.chan-dd-item .dd-detail{font-size:12px;color:var(--g7);margin-left:auto;white-space:nowrap}
+.cdot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+.cdot-wa,.cdot-sms{background:var(--nude)} .cdot-em{background:var(--g7)} .cdot-ig{background:var(--brown)} .cdot-fb{background:var(--g6)} .cdot-call{background:var(--blue)}
+.composer-send{height:38px;padding:0 20px;border-radius:var(--r20);border:0;background:var(--black);color:var(--white);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.composer-send:hover{background:var(--nude)}
+.composer-send:disabled{background:var(--g4);cursor:default}
+.composer-regen{font-size:12px;color:var(--nude);background:none;border:0;cursor:pointer;font-family:inherit}
+.composer-regen:hover{text-decoration:underline}
+.composer-note{font-size:11px;color:var(--g6);margin-left:auto;text-align:right;flex-basis:100%}
+.detail-sent{display:flex;align-items:center;gap:8px;padding:12px;border-radius:var(--r8);background:rgba(122,197,88,.12);border:1px solid var(--green-soft);color:#22542F;font-size:13px;font-weight:500;margin-bottom:18px}
+
+/* ── conversation thread — the centrepiece: a tall, scrollable history that
+   loads OLDER messages as the coordinator scrolls up (so they rarely need the
+   inbox just to read context). Mixes patient/clinic messages with logged calls
+   + system touch-points, like the live thread. ── */
+.thread{margin-bottom:16px}
+.thread-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.thread-head .th-title{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--g6)}
+.thread-head .th-meta{font-size:11px;color:var(--g6);margin-left:auto}
+.thread-head .th-inbox{font-size:11px;color:var(--nude);font-weight:600;text-decoration:none;white-space:nowrap}
+.thread-head .th-inbox:hover{text-decoration:underline}
+/* default shows the most recent ~handful; older load on scroll-up or via the button */
+.thread-scroll{display:flex;flex-direction:column;gap:7px;padding:12px;background:var(--g2);border:1px solid var(--g3);border-radius:var(--r8);min-height:150px;max-height:clamp(210px,34vh,360px);overflow-y:auto;overscroll-behavior:contain}
+.th-loadmore{align-self:center;margin-bottom:2px;font-size:11px;font-weight:600;color:var(--nude);background:var(--white);border:1px solid var(--p4);border-radius:var(--r20);padding:4px 13px;cursor:pointer;font-family:inherit}
+.th-loadmore:hover{background:var(--p2)}
+.th-msg{display:flex}
+.th-msg.out{justify-content:flex-end}
+.th-bubble{max-width:82%;padding:8px 11px;border-radius:14px;font-size:12.5px;line-height:1.45}
+.th-msg.in  .th-bubble{background:var(--white);border:1px solid var(--p4);color:var(--text-primary);border-bottom-left-radius:4px}
+.th-msg.out .th-bubble{background:var(--pink-medium);color:var(--black);border-bottom-right-radius:4px}
+/* logged call / note / system touch-point — centred, quiet, no bubble */
+.th-msg.log{justify-content:center}
+.th-msg.log .th-log{display:inline-flex;align-items:center;gap:6px;max-width:90%;font-size:11px;color:var(--g6);text-align:center;line-height:1.4}
+.th-msg.log .th-log .th-logico{color:var(--g5);flex-shrink:0;display:inline-flex}
+.th-start{align-self:center;font-size:11px;color:var(--g5);padding:4px 0 8px}
+.th-loading{align-self:center;font-size:11px;color:var(--g6);padding:6px 0}
+.thread-foot{display:flex;justify-content:flex-end;margin-top:9px}
+/* multi-interest "+N" badge in the list's Interest column */
+.int-more{display:inline-flex;align-items:center;height:16px;padding:0 5px;margin-left:4px;border-radius:var(--r4);background:var(--p3);color:var(--nude);font-size:10px;font-weight:600;vertical-align:1px}
+
+/* ── recommended patient-journey task (book consult / health declaration /
+   Silhouette) — a next action that isn't a message or a call ── */
+.task-card{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--p4);border-radius:var(--r8);background:var(--p2);margin-bottom:14px}
+.task-card .tc-ico{width:30px;height:30px;border-radius:var(--r8);background:var(--white);border:1px solid var(--p4);display:flex;align-items:center;justify-content:center;color:var(--nude);flex-shrink:0}
+.task-card .tc-body{flex:1;min-width:0}
+.task-card .tc-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+.task-card .tc-desc{font-size:12.5px;color:var(--g7);line-height:1.45;margin-top:3px}
+.task-card .tc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:11px}
+/* "why this action" — grounded in the person's most recent message */
+.tc-why{margin-top:10px;padding-top:9px;border-top:1px dashed var(--p4);font-size:12px;color:var(--g7);line-height:1.45}
+.tc-why .tc-why-msg{display:block;color:var(--text-primary);font-style:italic;margin-bottom:3px}
+.sa-hint.task .sa-ico{color:var(--nude)}
+.sec-title{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:none;color:var(--g6);margin-bottom:10px}
+.dq-list{display:flex;flex-direction:column;gap:7px;margin-bottom:22px}
+.dq-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--g7);line-height:1.4}
+.dq-item .dq-dot{width:6px;height:6px;border-radius:50%;background:var(--g5);margin-top:6px;flex-shrink:0}
+.dq-item.clean{color:var(--g6)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:7px 12px;margin-bottom:22px}
+.kv-k{font-size:13px;color:var(--g6)}
+.kv-v{font-size:13px;color:var(--text-primary)}
+.script-box{background:var(--g2);border:1px solid var(--g3);border-radius:var(--r4);padding:12px;font-size:13px;line-height:1.55;color:var(--text-primary);margin-bottom:22px}
+.dlog{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+.dlog-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--g7);padding:8px 10px;border:1px solid var(--g3);border-radius:var(--r4)}
+.dlog-row .dl-state{margin-left:auto;font-weight:600}
+.dlog-row.fail .dl-state{color:var(--red)} .dlog-row.ok .dl-state{color:#3D8B27}
+.tflag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r4);font-size:11px;font-weight:500;background:var(--g3);color:var(--g7);margin:0 6px 6px 0}
+
+/* ════════ ONBOARDING SETUP CONSOLE (role = onboarding) ════════ */
+#onboarding-console{display:none}
+body[data-role="onboarding"] #onboarding-console{display:flex}
+body[data-role="onboarding"] .filter-bar,
+body[data-role="onboarding"] .work-area,
+body[data-role="onboarding"] .new-leads-pill{display:none!important}
+.onb-console{flex:1;min-height:0;gap:22px}
+.onb-nav{width:212px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding-top:2px}
+.onb-nav button{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;border:0;background:transparent;border-radius:var(--r8);font-family:inherit;font-size:14px;color:var(--g7);cursor:pointer;transition:background .12s,color .12s}
+.onb-nav button:hover{background:var(--p2);color:var(--black)}
+.onb-nav button.active{background:var(--p3);color:var(--black);font-weight:600}
+.onb-nav button svg{flex-shrink:0}
+.onb-nav .onb-nav-note{margin-top:14px;padding:10px 12px;font-size:11px;color:var(--g6);line-height:1.5;border-top:1px solid var(--g3)}
+.onb-panel{flex:1;min-width:0;overflow-y:auto;padding:2px 6px 40px 0}
+.onb-h1{font-size:20px;font-weight:700;color:var(--text-primary);margin-bottom:4px}
+.onb-lede{font-size:13px;color:var(--g7);line-height:1.5;margin-bottom:20px;max-width:640px}
+.onb-card{border:1px solid var(--g3);border-radius:var(--r8);background:var(--white);padding:20px;margin-bottom:16px}
+.onb-card-h{font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:3px}
+.onb-card-sub{font-size:12.5px;color:var(--g7);line-height:1.45;margin-bottom:16px}
+.onb-save{height:34px;padding:0 18px;border-radius:var(--r20);border:0;background:var(--black);color:var(--white);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.onb-save:hover{background:var(--nude)}
+.onb-save.ghost{background:transparent;color:var(--g7);border:1px solid var(--p4)}
+.onb-save.ghost:hover{background:var(--p2);color:var(--black)}
+/* reusable toggle switch (hours Open/Closed, automation live/paused, channel on) */
+.tgl{position:relative;display:inline-flex;width:38px;height:22px;flex-shrink:0;cursor:pointer;vertical-align:middle}
+.tgl input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.tgl .tgl-track{width:38px;height:22px;border-radius:11px;background:var(--g4);transition:background .15s;position:relative}
+.tgl .tgl-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--white);transition:transform .15s;box-shadow:0 1px 2px rgba(52,47,44,.3)}
+.tgl input:checked + .tgl-track{background:var(--nude)}
+.tgl input:checked + .tgl-track .tgl-knob{transform:translateX(16px)}
+/* custom variables */
+.var-row{display:grid;grid-template-columns:1fr 22px 1.3fr 34px;align-items:center;gap:10px;margin-bottom:8px}
+.var-row .var-arrow{color:var(--g5);display:flex;justify-content:center}
+.var-name{display:flex;flex-direction:column;gap:2px;justify-content:center;min-width:0;height:46px;padding:5px 12px;border:1px solid var(--g3);border-radius:var(--r4);background:var(--g2)}
+.var-label{font-size:13px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.var-token{font-size:11px;color:var(--nude);font-family:ui-monospace,Menlo,monospace}
+.var-value{display:flex;align-items:center;gap:8px;min-width:0;height:46px;padding:0 12px;border:1px solid var(--g3);border-radius:var(--r4);background:var(--white);font-size:13px;color:var(--text-primary)}
+.var-value > :first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.var-empty{color:var(--g5)}
+.var-menu-wrap{position:relative;justify-self:center}
+.var-menu-btn{width:30px;height:30px;border-radius:50%;border:0;background:transparent;color:var(--g6);cursor:pointer;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center}
+.var-menu-btn:hover{background:var(--p2);color:var(--black)}
+.var-menu{display:none;position:absolute;right:0;top:calc(100% + 4px);min-width:152px;background:var(--white);border:1px solid var(--p4);border-radius:var(--r8);box-shadow:0 6px 18px rgba(52,47,44,.16);z-index:50;overflow:hidden}
+.var-menu.open{display:block}
+.var-menu button{display:block;width:100%;text-align:left;padding:9px 13px;border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--text-primary);cursor:pointer}
+.var-menu button:hover{background:var(--p2)}
+.var-menu button.danger{color:var(--red)}
+.var-menu button.danger:hover{background:rgba(203,65,55,.08)}
+.var-saved{margin-left:auto;font-size:11px;font-weight:600;color:#3D8B27;white-space:nowrap;animation:varSavedIn .2s ease}
+@keyframes varSavedIn{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}
+.var-row.editing{grid-template-columns:1fr 22px 1.3fr auto auto}
+.var-edit{height:42px;border:1px solid var(--nude);border-radius:var(--r4);padding:0 12px;font-family:inherit;font-size:13px;color:var(--text-primary);background:var(--white);width:100%;outline:none}
+.var-edit:focus{box-shadow:0 0 0 3px var(--p3)}
+.var-save{height:38px;padding:0 15px;border-radius:var(--r20);border:0;background:var(--black);color:var(--white);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.var-save:hover{background:var(--nude)}
+.var-cancel{height:38px;padding:0 12px;border-radius:var(--r20);border:1px solid var(--p4);background:transparent;color:var(--g7);font-family:inherit;font-size:12px;cursor:pointer}
+.var-cancel:hover{background:var(--p2);color:var(--black)}
+.var-add{margin-top:8px;font-size:13px;font-weight:600;color:var(--nude);background:none;border:0;cursor:pointer;font-family:inherit;padding:4px 0}
+.var-add:hover{text-decoration:underline}
+/* opening hours */
+.hours-row{display:grid;grid-template-columns:120px 96px 1fr 1fr;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--g2)}
+.hours-row:last-child{border-bottom:0}
+.hours-day{font-size:13px;color:var(--text-primary)}
+.hours-state{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--g7)}
+.hours-time{height:34px;border:1px solid var(--p4);border-radius:var(--r4);padding:0 10px;font-family:inherit;font-size:13px;color:var(--text-primary);background:var(--white)}
+.hours-row.closed .hours-time{background:var(--g2);color:var(--g5)}
+/* brand colour + currency rows */
+.onb-field{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 0}
+.onb-field-k{font-size:13px;font-weight:600;color:var(--text-primary)}
+.onb-field-sub{font-size:12px;color:var(--g7);margin-top:2px}
+.color-input{display:inline-flex;align-items:center;gap:10px}
+.color-input input{height:36px;border:1px solid var(--p4);border-radius:var(--r4);padding:0 10px;font-family:inherit;font-size:13px;width:120px}
+.color-swatch{width:34px;height:34px;border-radius:var(--r4);border:1px solid var(--p4)}
+.currency-pill{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--p4);border-radius:var(--r4);font-size:13px;color:var(--text-primary)}
+/* email domains */
+.benefit-list{list-style:none;margin:8px 0 16px;padding:0;display:flex;flex-direction:column;gap:7px}
+.benefit-list li{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text-primary)}
+.benefit-list li .bl-ico{color:var(--nude);flex-shrink:0}
+.dom-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--g3);border-radius:var(--r8);margin-bottom:8px}
+.dom-row .dom-ico{color:var(--nude);display:flex;flex-shrink:0}
+.dom-name{font-size:14px;color:var(--text-primary);font-weight:500}
+.dom-sub{font-size:11.5px;color:var(--g6);margin-top:1px}
+.dom-badge{margin-left:auto;display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:var(--r20);font-size:11.5px;font-weight:600}
+.dom-badge.ok{background:rgba(122,197,88,.16);color:#3D8B27}
+.dom-badge.pending{background:var(--yellow-soft);color:#8A6D1A}
+.dom-badge .db-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.dom-link{font-size:12px;color:var(--nude);font-weight:600;cursor:pointer;margin-left:12px}
+.dom-link:hover{text-decoration:underline}
+/* automations */
+.auto-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.auto-add{height:34px;padding:0 15px;border-radius:var(--r20);border:0;background:var(--black);color:var(--white);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.auto-add:hover{background:var(--nude)}
+.auto-group-label{font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--g6);margin:18px 0 8px}
+.auto-row{display:flex;align-items:center;gap:13px;padding:14px 16px;border:1px solid var(--g3);border-radius:var(--r8);background:var(--white);margin-bottom:8px}
+.auto-row .auto-bolt{width:30px;height:30px;border-radius:var(--r8);background:var(--p2);color:var(--nude);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.auto-main{flex:1;min-width:0;cursor:pointer}
+.auto-name{font-size:14px;font-weight:600;color:var(--text-primary)}
+.auto-status{font-size:12px;color:var(--g6);margin-top:2px}
+.auto-status .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;vertical-align:1px}
+.auto-row.paused .auto-bolt{background:var(--g2);color:var(--g5)}
+.auto-row.paused .auto-status .live-dot{background:var(--g4)}
+.auto-icobtn{width:30px;height:30px;border-radius:50%;border:0;background:transparent;color:var(--g6);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.auto-icobtn:hover{background:var(--p2);color:var(--black)}
+.auto-expand{border:1px solid var(--p4);border-top:0;border-radius:0 0 var(--r8) var(--r8);background:var(--bg);margin:-8px 0 8px;padding:16px}
+.ae-field{margin-bottom:12px}
+.ae-label{font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--g6);margin-bottom:5px}
+.ae-input,.ae-textarea{width:100%;border:1px solid var(--p4);border-radius:var(--r4);padding:9px 11px;font-family:inherit;font-size:13px;color:var(--text-primary);background:var(--white);line-height:1.5}
+.ae-textarea{resize:vertical;min-height:120px}
+.ae-foot{display:flex;align-items:center;gap:10px;margin-top:4px}
+.ae-hint{font-size:11px;color:var(--g6)}
+/* A/B variants comparison */
+.ab-wrap{margin-top:16px;border-top:1px solid var(--g3);padding-top:14px}
+.ab-title{font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:2px}
+.ab-sub{font-size:11.5px;color:var(--g7);margin-bottom:10px}
+.ab-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ab-card{border:1px solid var(--p4);border-radius:var(--r8);background:var(--white);padding:12px}
+.ab-card.win{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
+.ab-card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ab-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.ab-win-tag{font-size:10px;font-weight:700;color:#3D8B27;background:rgba(122,197,88,.16);border-radius:var(--r4);padding:2px 6px}
+.ab-metric{display:flex;align-items:baseline;justify-content:space-between;font-size:12px;color:var(--g7);padding:3px 0}
+.ab-metric b{font-size:15px;color:var(--text-primary);font-weight:700;font-variant-numeric:tabular-nums}
+.ab-add{margin-top:10px;font-size:12.5px;font-weight:600;color:var(--nude);background:none;border:0;cursor:pointer;font-family:inherit}
+.ab-add:hover{text-decoration:underline}
+/* lead channels */
+.chan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.chan-card{border:1px solid var(--g3);border-radius:var(--r8);background:var(--white);padding:18px;display:flex;flex-direction:column;gap:10px}
+.chan-card .cc-ico{width:40px;height:40px;border-radius:var(--r8);display:flex;align-items:center;justify-content:center;color:var(--white)}
+.chan-card .cc-title{font-size:14.5px;font-weight:700;color:var(--text-primary)}
+.chan-card .cc-desc{font-size:12.5px;color:var(--g7);line-height:1.45;flex:1}
+.chan-card .cc-btn{align-self:flex-start;height:32px;padding:0 15px;border-radius:var(--r20);border:1px solid var(--black);background:var(--black);color:var(--white);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.chan-card .cc-btn:hover{background:var(--nude);border-color:var(--nude)}
+.chan-card.connected .cc-btn{background:transparent;color:#3D8B27;border-color:var(--green)}
+.chan-card .cc-connected{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#3D8B27}
+@media (max-width:820px){
+  .onb-console{flex-direction:column;gap:12px}
+  .onb-nav{width:100%;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
+  .onb-nav button{white-space:nowrap;flex-shrink:0}
+  .onb-nav .onb-nav-note{display:none}
+  .var-row{grid-template-columns:1fr 34px;gap:6px}
+  .var-row.editing{grid-template-columns:1fr auto auto}
+  .var-row .var-arrow{display:none}
+  .var-name{grid-column:1;height:auto;padding:8px 12px}
+  .var-value{grid-column:1}
+  .var-menu-wrap{grid-column:2;grid-row:1}
+  .hours-row{grid-template-columns:1fr 1fr;gap:8px}
+  .ab-grid{grid-template-columns:1fr}
+  .chan-grid{grid-template-columns:1fr}
+}
+
+/* ── mobile bottom product-nav (verbatim) ── */
+.product-nav{position:fixed;bottom:0;left:0;right:0;width:100%;height:64px;background:var(--white);border-top:1px solid var(--p4);display:flex;flex-direction:row;z-index:30;padding:0 4px}
+.product-nav-item{flex:1 1 0;min-width:0;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;background:transparent;border:0;font-family:inherit;text-decoration:none;color:var(--g7);cursor:pointer;position:relative;transition:color .12s}
+.product-nav-item:hover{color:var(--black)}
+.product-nav-item.active{color:var(--black)}
+.product-nav-item.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:32px;height:2px;background:var(--black);border-radius:1px}
+.product-nav-icon{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+.product-nav-label{font-size:9px;line-height:1;letter-spacing:.1px;white-space:nowrap}
+.product-nav-item.active .product-nav-label{font-weight:600}
+.product-nav-badge{position:absolute;top:6px;right:calc(50% - 22px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--nude);color:var(--white);font-size:9px;font-weight:700;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.product-nav-badge:empty,.product-nav-badge.zero{display:none}
+.product-nav{display:none}
+@media (max-width:1024px){ .product-nav{display:flex} .main{padding-bottom:0} .shell{height:calc(100vh - 56px - 64px)} }
+
+/* responsive list: drop Interest first, then collapse to two-line rows */
+/* iPad / narrow-desktop: tighten every role's tracks so nothing overflows.
+   Coordinator drops Interest; Onboarding drops Interest + Setup; Support
+   narrows the automation read-out. */
+/* iPad / narrow-desktop: tighten every role's tracks so nothing overflows.
+   Cells aren't hidden until ≤820px, so track COUNTS stay the same here
+   (coordinator 7, onboarding 8, support 6) — only widths shrink. */
+@media (max-width:1100px){
+  body[data-role="coordinator"]{--cols:84px 1.5fr 100px 0.9fr 82px 130px 30px}
+  body[data-role="onboarding"]{--cols:80px 1.3fr 96px 0.8fr 78px 50px 120px 30px}
+  body[data-role="support"]{--cols:84px 1.5fr 100px 1fr 130px 30px}
+}
+@media (max-width:820px){
+  .leads-head{display:none}
+  .lead-row{grid-template-columns:1fr !important;gap:4px;padding:12px 14px 12px 18px;min-height:0}
+  .lead-end{justify-content:flex-start;margin-top:2px}
+  .lead-interest,.lead-stage,.lead-setup,.lead-engine,.lead-value{display:none !important}
+  .lead-end{display:none !important}
+}
+</style>
+</head>
+<body data-role="coordinator">
+
+<!-- ══ TOP BAR ══ -->
+<div class="aos-topbar" data-testid="topbar">
+  <div class="aos-wordmark" data-testid="wordmark">adoreal.</div>
+  <div class="aos-search" data-testid="topbar-search">
+    <span class="aos-search-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+    <input type="text" placeholder="Search Patient" disabled/>
+  </div>
+  <nav class="aos-nav">
+    <span class="aos-nav-item" data-testid="topnav-dashboard">Dashboard</span>
+    <span class="aos-nav-item" data-testid="topnav-schedule">Schedule</span>
+    <span class="aos-nav-item active" data-testid="topnav-contact-center">Contact Center</span>
+    <span class="aos-nav-item" data-testid="topnav-financials">Financials</span>
+    <a class="aos-nav-item" href="inbox.html" data-testid="topnav-inbox">Inbox</a>
+  </nav>
+  <div class="aos-right">
+    <div class="pending-anchor">
+      <button class="aos-icon-btn" title="Pending tasks" aria-label="Pending tasks" id="pending-btn" onclick="togglePendingMenu(event)" data-testid="pending-btn" aria-expanded="false" aria-haspopup="true">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><polyline points="3,8 6.5,11.5 13,4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="pending-dot" id="pending-dot" data-testid="pending-dot"></span>
+      </button>
+      <div class="pending-menu" id="pending-menu" role="menu" data-testid="pending-menu">
+        <div class="pending-menu-head">
+          <div class="pending-menu-title">Leads waiting: (<span id="pending-count">—</span>)</div>
+          <div class="pending-menu-overdue">(<span id="pending-overdue">—</span> need you now)</div>
+        </div>
+        <button class="pending-menu-action" onclick="closePendingMenu();filterToHot()" data-testid="pending-view-hot">Show the hot ones →</button>
+      </div>
+    </div>
+    <div class="version-toast-anchor">
+      <button class="aos-icon-btn" title="Settings" aria-label="Settings" onclick="showVersion()" id="aos-settings-btn" data-testid="gear-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <div class="version-toast" id="version-toast" role="status" aria-live="polite">
+        <span class="version-toast-label">Prototype</span>
+        <span class="version-toast-num" id="version-toast-num" data-testid="version-num">v—</span>
+      </div>
+    </div>
+    <div class="aos-user">
+      <div class="aos-user-av">AS</div>
+      <span class="aos-user-name">Alex Smith</span>
+      <span class="aos-user-caret"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHELL ══ -->
+<div class="shell">
+  <main class="main" data-testid="main">
+
+    <!-- Context strip -->
+    <div class="context-strip">
+      <div class="context-summary" id="context-summary" data-testid="context-summary" aria-live="polite">—</div>
+      <div class="role-switcher" role="tablist" data-testid="role-switcher">
+        <button class="role-option active" role="tab" data-role="coordinator" onclick="setRole('coordinator')" data-testid="role-option-coordinator">Patient coordinator</button>
+        <button class="role-option" role="tab" data-role="onboarding" onclick="setRole('onboarding')" data-testid="role-option-onboarding">Onboarding</button>
+        <button class="role-option" role="tab" data-role="support" onclick="setRole('support')" data-testid="role-option-support">Adoreal support</button>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar" data-testid="filter-bar">
+      <label class="filter-search">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input type="text" id="filter-search" data-testid="filter-search" placeholder="Search name, phone, email…" oninput="onSearchInput(this.value)"/>
+      </label>
+      <button class="filter-pill" id="filter-urgency-pill" data-testid="filter-urgency">
+        Urgency:&nbsp;<select id="filter-urgency" onchange="onFilterChange('urgency',this.value)">
+          <option value="all">All</option>
+          <option value="hot">Hot</option>
+          <option value="cooling">Cooling</option>
+          <option value="slow">Slow</option>
+          <option value="stale">Stale</option>
+          <option value="contacted">Contacted</option>
+        </select>
+      </button>
+      <button class="filter-pill" id="filter-status-pill" data-testid="filter-status">
+        Status:&nbsp;<select id="filter-status" onchange="onFilterChange('status',this.value)">
+          <option value="all">All</option>
+          <option value="uncontacted">Uncontacted</option>
+          <option value="in_progress">In progress</option>
+          <option value="replied">Replied</option>
+          <option value="snoozed">Snoozed</option>
+          <option value="closed">Closed</option>
+        </select>
+      </button>
+      <button class="filter-pill" id="filter-source-pill" data-testid="filter-source">
+        Source:&nbsp;<select id="filter-source" onchange="onFilterChange('source',this.value)">
+          <option value="all">All</option>
+          <option value="instagram">Instagram</option>
+          <option value="facebook">Facebook</option>
+          <option value="website">Website form</option>
+          <option value="katie">Katie</option>
+          <option value="phone">Phone</option>
+          <option value="walkin">Walk-in</option>
+          <option value="referral">Referral</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </button>
+      <button class="filter-pill" id="filter-procedure-pill" data-testid="filter-procedure">
+        Procedure:&nbsp;<select id="filter-procedure" onchange="onFilterChange('procedure',this.value)">
+          <option value="all">All</option>
+        </select>
+      </button>
+      <button class="filter-clear" id="filter-clear" onclick="clearFilters()" style="display:none" data-testid="filter-clear">Clear filters</button>
+      <span class="filter-spacer"></span>
+      <button class="realtime-toggle live" id="realtime-toggle" data-testid="realtime-toggle" onclick="toggleRealtime()">
+        <span class="realtime-dot"></span><span id="realtime-label">Live</span>
+      </button>
+    </div>
+
+    <!-- realtime new-leads pill (when not at top of page 1) -->
+    <button class="new-leads-pill" id="new-leads-pill" data-testid="new-leads-pill" onclick="showNewLeads()">↑ <span id="new-leads-count">0</span> new leads — show</button>
+
+    <!-- v0.15 — master/detail. Left: the list (top ~6 above the fold).
+         Right: the auto-selected lead with a 1-click message composer.
+         On mobile the detail pane becomes a slide-over sheet. -->
+    <div class="work-area">
+      <div class="leads-col">
+        <div class="leads-wrap">
+          <div class="leads-head" id="leads-head"></div>
+          <div class="leads-body" id="leads-body" data-testid="leads-list"></div>
+        </div>
+        <div class="pagination" data-testid="pagination">
+          <div class="pagination-summary" id="pagination-summary" data-testid="pagination-summary">—</div>
+          <div class="pagination-controls" id="pagination-controls"></div>
+        </div>
+      </div>
+
+      <aside class="detail-pane" id="detail-pane" data-testid="lead-detail" aria-label="Selected lead">
+        <div class="detail-head">
+          <div class="drawer-av" id="d-av">—</div>
+          <div class="drawer-head-main">
+            <div class="drawer-name" id="d-name">—</div>
+            <div class="drawer-sub" id="d-sub">—</div>
+          </div>
+          <button class="drawer-close" onclick="closeDetail()" aria-label="Close" data-testid="detail-close"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><line x1="4" y1="4" x2="12" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="12" y1="4" x2="4" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        </div>
+        <div class="detail-body" id="detail-body"></div>
+      </aside>
+    </div>
+
+    <!-- ══ ONBOARDING SETUP CONSOLE (role = onboarding) — clinic configuration ══ -->
+    <div class="onb-console" id="onboarding-console" data-testid="onboarding-console">
+      <nav class="onb-nav" id="onb-nav" data-testid="onb-nav"></nav>
+      <div class="onb-panel" id="onb-panel" data-testid="onb-panel"></div>
+    </div>
+
+  </main>
+</div>
+<div class="detail-scrim" id="detail-scrim" onclick="closeDetail()"></div>
+
+<!-- ══ MOBILE PRODUCT NAV (verbatim) ══ -->
+<nav class="product-nav" data-testid="product-nav" aria-label="Product navigation">
+  <a class="product-nav-item" href="#" onclick="event.preventDefault();stubNav('Dashboard')" data-testid="pnav-dashboard"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="product-nav-label">Dashboard</span></a>
+  <a class="product-nav-item" href="#" onclick="event.preventDefault();stubNav('Schedule')" data-testid="pnav-schedule"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></span><span class="product-nav-label">Schedule</span></a>
+  <a class="product-nav-item active" href="#" onclick="event.preventDefault()" data-testid="pnav-contact-center" aria-current="page"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg></span><span class="product-nav-label">Contact Center</span></a>
+  <a class="product-nav-item" href="#" onclick="event.preventDefault();stubNav('Patients')" data-testid="pnav-patients"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.7"/></svg></span><span class="product-nav-label">Patients</span></a>
+  <a class="product-nav-item" href="#" onclick="event.preventDefault();stubNav('Financials')" data-testid="pnav-financials"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="product-nav-label">Financials</span></a>
+  <a class="product-nav-item" href="#" onclick="event.preventDefault();stubNav('Settings')" data-testid="pnav-settings"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="product-nav-label">Settings</span></a>
+  <a class="product-nav-item" href="inbox.html" data-testid="pnav-inbox"><span class="product-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span><span class="product-nav-label">Inbox</span></a>
+</nav>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   v0.14 — Speed-to-lead leads list. See header comment for the blueprint.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const VERSION = '0.24';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ── deterministic PRNG so the 2,400 seed is stable across reloads ── */
+function mulberry32(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+/* ── clock: overridable so tests can freeze it ── */
+let NOW_OVERRIDE = null;
+function clock(){ return NOW_OVERRIDE != null ? NOW_OVERRIDE : Date.now(); }
+const BOOT = Date.now();
+const MIN = 60*1000, HR = 60*MIN, DAY = 24*HR;
+
+/* ── reference data ── */
+const SOURCES = {
+  instagram:{label:'Instagram'}, facebook:{label:'Facebook'}, website:{label:'Website form'},
+  katie:{label:'Katie'}, phone:{label:'Phone'}, walkin:{label:'Walk-in'},
+  referral:{label:'Referral'}, unknown:{label:'Unknown source'},
+};
+const PROCEDURES = ['Rhinoplasty','Breast augmentation','Breast lift','Tummy tuck','Liposuction','Facelift','Lip filler','Botox','Eyelid surgery','Mummy makeover','Laser hair removal','Skin resurfacing','Brow lift','Gynecomastia','Mole removal'];
+/* rough deal size per procedure (USD — Belcara Health is US-based) — drives the per-lead estimated value so
+   high-value enquiries stand out. Multi-procedure enquiries sum. */
+const PROCEDURE_VALUE = {
+  'Rhinoplasty':7500,'Breast augmentation':9000,'Breast lift':8500,'Tummy tuck':9500,
+  'Liposuction':6000,'Facelift':12000,'Lip filler':350,'Botox':300,'Eyelid surgery':5000,
+  'Mummy makeover':15000,'Laser hair removal':900,'Skin resurfacing':1500,'Brow lift':6500,
+  'Gynecomastia':7000,'Mole removal':500,
+};
+function fmtMoney(v){ return v ? '$'+Number(v).toLocaleString('en-US') : '—'; }
+/* Stages mirror inbox.html exactly (Discover→Long-term) — same vocabulary AND
+   same chip colours — so a person's stage reads identically across both tools. */
+const STAGES = ['discover','consult','decide','preop','surgery','recover','longterm'];
+const STAGE_META = {
+  discover:{label:'Discover',  cls:'sp-discover'},
+  consult: {label:'Consult',   cls:'sp-consult'},
+  decide:  {label:'Decide',    cls:'sp-decide'},
+  preop:   {label:'Pre-op',    cls:'sp-preop'},
+  surgery: {label:'Surgery',   cls:'sp-surgery'},
+  recover: {label:'Recover',   cls:'sp-recover'},
+  longterm:{label:'Long-term', cls:'sp-longterm'},
+};
+const STAGE_LABEL = Object.fromEntries(Object.entries(STAGE_META).map(([k,v]) => [k, v.label]));
+function stageChip(l){ const s = STAGE_META[l.stage] || STAGE_META.discover; return `<span class="stage-chip ${s.cls}">${esc(s.label)}</span>`; }
+const STATUS_LABEL = {uncontacted:'Uncontacted',in_progress:'In progress',replied:'Replied',snoozed:'Snoozed',closed:'Closed'};
+const FIRST=['Emma','Sofia','Laura','Priya','Yuki','Mei','Beatrice','Camille','Charlotte','Ava','Mia','Olivia','Isla','Freya','Nadia','Hannah','Zoe','Lucia','Maya','Chloe','Ruby','Grace','Léa','Anna','Sara','Elena','Nora','Ida','清','Aisha','Fatima','Yasmin','Daniela','Marta','Ingrid','Sophie','Jessica','Jennifer','Megan','Holly','Paige','Tara','Vera','Lena','Romy','Bea','Noor','Lily','Eva','Klara'];
+const LAST=['Lindqvist','Andersen','Müller','Nair','Tanaka','Kowalski','Johansson','Olsen','Webb','Reeves','Costa','Khan','Brooks','Park','Mehta','Sjöberg','Rossi','Chen','Vance','Holloway','Pearson','Nguyen','Schmidt','Dubois','Romano','Ahmed','Kaur','Walsh','Petrova','Larsen','Bauer','Fischer','Ivanova','Silva','Moreau','Hansen','Berg','Novak','Haas','Vogel'];
+
+/* ── data-quality codes ── */
+const DEFECTS = {
+  name_handle:'Name is an Instagram handle, not verified',
+  name_partial:'Name looks incomplete',
+  name_junk:'Name looks like junk input',
+  phone_missing:'No phone number on file',
+  phone_partial:'Phone number looks incomplete',
+  email_bounced:'Email bounced recently',
+  email_missing:'No email on file',
+  duplicate:'Possible duplicate of another lead',
+  no_consent:'No SMS marketing consent on file',
+  interest_blank:'No stated interest',
+  source_unknown:'Source could not be determined',
+  spam:'Looks like spam',
+};
+
+/* ── seed ~2,400 leads deterministically ── */
+const TOTAL_SEED = 2400;
+let LEADS = [];
+let NEXT_ID = 1;
+
+function buildSeed(){
+  const rnd = mulberry32(20260519);
+  const pick = arr => arr[Math.floor(rnd()*arr.length)];
+  const chance = p => rnd() < p;
+  const out = [];
+
+  /* 9 featured leads map to real inbox threads, placed hot/cooling so the
+     demo's clickable rows land on actual conversations in inbox.html. */
+  const featured = [
+    {inboxPatientId:3,  first:'Charlotte', last:'Webb',       source:'phone',     interest:'Facelift',            ageMs:18*DAY, chan:'sms', status:'replied', stage:'recover'},
+    {inboxPatientId:0,  first:'Emma',      last:'Lindqvist',  source:'instagram', interest:'Rhinoplasty',         ageMs:4*MIN,  chan:'wa',  stage:'discover'},
+    {inboxPatientId:9,  first:'Yuki',      last:'Tanaka',     source:'referral',  interest:'Eyelid surgery',      ageMs:9*MIN,  chan:'em',  stage:'consult'},
+    {inboxPatientId:2,  first:'Laura',     last:'Müller',     source:'instagram', interest:'Tummy tuck',          ageMs:26*MIN, chan:'sms', stage:'discover', interests:['Tummy tuck','Breast augmentation']},
+    {inboxPatientId:5,  first:'Priya',     last:'Nair',       source:'referral',  interest:'Liposuction',         ageMs:48*MIN, chan:'em',  stage:'consult'},
+    {inboxPatientId:1,  first:'Sofie',     last:'Andersen',   source:'referral',  interest:'Breast augmentation', ageMs:3*HR,   chan:'em',  status:'replied',     stage:'preop'},
+    {inboxPatientId:12, first:'Mei',       last:'Kowalski',   source:'facebook',  interest:'Laser hair removal',  ageMs:3*DAY,  chan:'em',  status:'in_progress', stage:'decide',   interests:['Laser hair removal','Lip filler']},
+    {inboxPatientId:13, first:'Beatrice',  last:'Johansson',  source:'referral',  interest:'Rhinoplasty',         ageMs:5*DAY,  chan:'wa',  status:'replied',     stage:'surgery'},
+    {inboxPatientId:14, first:'Camille',   last:'Olsen',      source:'instagram', interest:'Lip filler',          ageMs:30*DAY, chan:'em',  status:'replied',     stage:'longterm'},
+  ];
+  for (const f of featured){
+    out.push(makeLead(rnd, {
+      name:`${f.first} ${f.last}`, nameQuality:'ok', source:f.source, interest:f.interest, interests:f.interests||[f.interest],
+      arrivedAt: BOOT - f.ageMs, status: f.status || 'uncontacted', stage: f.stage,
+      inboxPatientId:f.inboxPatientId, preferredChannel:f.chan,
+      phone:'+1 410 555 '+String(1000+Math.floor(rnd()*8999)), phoneValid:true,
+      email:`${f.first.toLowerCase()}.${f.last.toLowerCase().replace(/[^a-z]/g,'')}@gmail.com`, emailStatus:'ok',
+      smsConsent:true, clean:true,
+    }));
+  }
+
+  for (let i = out.length; i < TOTAL_SEED; i++){
+    /* age distribution: a few hot, some cooling, many slow/stale, lots contacted */
+    const r = rnd();
+    let ageMs;
+    /* Hot is kept RARE and precious — a clinic with a healthy speed-to-lead
+       habit should have only a handful of just-arrived uncontacted leads at
+       once. Too many red gutters becomes the alarm the founder rejected. */
+    if (r < 0.0016) ageMs = rnd()*5*MIN;             // hot     (~4)
+    else if (r < 0.007) ageMs = 5*MIN + rnd()*55*MIN; // cooling (~13)
+    else if (r < 0.06) ageMs = HR + rnd()*23*HR;      // slow    (~130)
+    else if (r < 0.20) ageMs = DAY + rnd()*40*DAY;    // stale-eligible (~335)
+    else ageMs = rnd()*45*DAY;                        // contacted-eligible
+    out.push(makeLead(rnd, {arrivedAt: BOOT - ageMs}));
+  }
+
+  /* Demo thread depth: assign each uncontacted person a thread length by their
+     initial position in the speed-to-lead list, so the top rows carry rich,
+     scrollable conversations and most new enquiries are a single message.
+     (Top lead ~25, next ~15, rest of the top 5 >10, then tapering to 1.) */
+  out.filter(l => l.status === 'uncontacted')
+    .sort((a,b) => { const ra=TIER_RANK[urgencyTier(a,BOOT)], rb=TIER_RANK[urgencyTier(b,BOOT)]; return ra!==rb ? ra-rb : a.arrivedAt-b.arrivedAt; })
+    .forEach((l,i) => {
+      l.threadLen = i===0 ? 25 : i===1 ? 15 : i<5 ? (13-(i-2)) : i<12 ? (10-(i-5)) : (1 + (threadHash(l.id) % 2));
+    });
+  return out;
+}
+
+function makeLead(rnd, over){
+  const pick = arr => arr[Math.floor(rnd()*arr.length)];
+  const chance = p => rnd() < p;
+  let first = pick(FIRST), last = pick(LAST);
+  let name = `${first} ${last}`, nameQuality = 'ok';
+  let source = pick(Object.keys(SOURCES).filter(s=>s!=='unknown'));
+  let interest = pick(PROCEDURES);
+  // ~22% of people enquire about more than one procedure (e.g. a mummy makeover
+  // combo). interest stays the PRIMARY; interests carries the full list.
+  let interests = [interest];
+  if (chance(0.22)){
+    const more = PROCEDURES.filter(p => !interests.includes(p));
+    interests.push(more[Math.floor(rnd()*more.length)]);
+    if (chance(0.22)){ const more2 = PROCEDURES.filter(p => !interests.includes(p)); interests.push(more2[Math.floor(rnd()*more2.length)]); }
+  }
+  let phone = '+1 '+pick(['410','305','646','312','617'])+' 555 '+String(1000+Math.floor(rnd()*8999));
+  let phoneValid = true;
+  let email = `${first.toLowerCase()}.${last.toLowerCase().replace(/[^a-z]/g,'')}@`+pick(['gmail.com','outlook.com','yahoo.com','icloud.com']);
+  let emailStatus = 'ok';
+  let smsConsent = chance(0.85);
+  let status = 'uncontacted';
+  let stage = 'discover';
+  let duplicateOf = null, isSpam = false;
+  const defects = [];
+
+  if (!over || !over.clean){
+    /* dirty-data injection (~20% defect rate spread across fields) */
+    if (chance(0.10)){ // name issues
+      if (chance(0.5)){ name = '@'+first.toLowerCase()+(chance(0.5)?'_':'')+Math.floor(rnd()*99); nameQuality='handle'; defects.push('name_handle'); }
+      else if (chance(0.5)){ name = first; nameQuality='partial'; defects.push('name_partial'); }
+      else { name = pick(['asdf','test test','aaa','...','—']); nameQuality='junk'; defects.push('name_junk'); }
+    }
+    if (chance(0.15)){ if (chance(0.5)){ phone=null; phoneValid=false; defects.push('phone_missing'); } else { phone=phone.slice(0,10); phoneValid=false; defects.push('phone_partial'); } }
+    if (chance(0.10)){ if (chance(0.6)){ emailStatus='bounced'; defects.push('email_bounced'); } else { email=null; emailStatus='missing'; defects.push('email_missing'); } }
+    if (chance(0.18)){ interest=''; interests=[]; defects.push('interest_blank'); }
+    if (chance(0.05)){ source='unknown'; defects.push('source_unknown'); }
+    if (!smsConsent) defects.push('no_consent');
+    if (chance(0.015)){ isSpam=true; name=pick(['asdf','Test test','xxxx']); nameQuality='junk'; defects.push('spam'); }
+  } else {
+    if (!smsConsent) defects.push('no_consent');
+  }
+
+  /* status / stage from age, unless overridden */
+  const arrivedAt = over && over.arrivedAt != null ? over.arrivedAt : (BOOT - rnd()*45*DAY);
+  const age = BOOT - arrivedAt;
+  if (over && over.status){ status = over.status; }
+  else if (age > 3*DAY && chance(0.7)){ status = pick(['replied','in_progress','closed','snoozed']); }
+  else if (age > DAY && chance(0.35)){ status = pick(['in_progress','replied','snoozed']); }
+  // pre-patient leads skew early: most are Discover, a contacted few progress.
+  if (status === 'replied' || status === 'closed') stage = pick(['consult','consult','decide','decide','preop']);
+  else if (status === 'in_progress') stage = pick(['discover','consult','consult','decide']);
+  else if (status === 'snoozed') stage = pick(['discover','consult']);
+  else if (chance(0.12)) stage = 'consult'; // a few uncontacted have already booked a consult
+
+  const contacted = (status !== 'uncontacted');
+  const lead = Object.assign({
+    id: NEXT_ID++,
+    inboxPatientId: null,
+    name, nameQuality,
+    arrivedAt,
+    status,
+    firstOutboundAt: contacted ? arrivedAt + Math.floor(rnd()*6*HR) : null,
+    lastTouchAt: contacted ? arrivedAt + Math.floor(rnd()*12*HR) : null,
+    source, interest, interests, stage,
+    /* preferred channel tracks the source so messaging suggestions read
+       naturally (an Instagram lead → Instagram/WhatsApp, a phone lead → call).
+       This is what makes most suggested actions messages, not calls. */
+    preferredChannel: ({instagram:'wa', facebook:'wa', website:'em', katie:'wa', referral:'wa', walkin:'sms', phone:'sms', unknown:'em'}[source]) || pick(['wa','em']),
+    phone, phoneValid,
+    email, emailStatus,
+    smsConsent,
+    duplicateOf, isSpam,
+    defects,
+    setup: { accountCreated: chance(0.5), formsReturned: chance(0.35), consultBooked: status==='replied'||status==='closed' ? chance(0.6):chance(0.1) },
+    automation: buildAutomation(rnd, status, defects),
+  }, over || {});
+  // recompute defects if overridden cleanly
+  if (over && over.clean){ lead.defects = lead.smsConsent ? [] : ['no_consent']; }
+  // estimated value from the final interest set (+ deterministic ±10% by id, so
+  // we don't perturb the PRNG sequence). Blank-interest leads show no value.
+  lead.value = (lead.interests || []).reduce((s,p) => s + (PROCEDURE_VALUE[p] || 0), 0);
+  if (lead.value){ const j = 0.9 + ((threadHash(lead.id) % 21) / 21) * 0.2; lead.value = Math.round(lead.value * j / 50) * 50; }
+  return lead;
+}
+
+function buildAutomation(rnd, status, defects){
+  const pick = arr => arr[Math.floor(rnd()*arr.length)];
+  // most auto-sends succeed; failures correlate with dirty data
+  let state = 'done', delivery = [{channel:'em',status:'delivered'}];
+  const tflags = [];
+  if (defects.includes('email_bounced')){ delivery=[{channel:'em',status:'bounced'}]; state='failed'; }
+  if (defects.includes('no_consent')){ tflags.push('no_consent_held'); state = state==='failed'?'failed':'blocked'; delivery.push({channel:'sms',status:'held'}); }
+  if (rnd() < 0.04){ tflags.push('placeholder_unresolved'); state='failed'; }
+  if (rnd() < 0.03){ tflags.push('link_blocked'); state='failed'; }
+  if (status==='uncontacted' && rnd()<0.3) state='queued';
+  return { lastEvent: pick(['Enquiry acknowledgement','Welcome email + SMS','Day-3 nudge','Re-engagement touch','Booking reminder']), state, at: Date.now()-Math.floor(rnd()*3*DAY), delivery, templateFlags:tflags };
+}
+
+/* ── pure: urgency tier ── */
+function urgencyTier(lead, now){
+  now = now || clock();
+  if (lead.status !== 'uncontacted' || lead.firstOutboundAt) return 'contacted';
+  const age = now - lead.arrivedAt;
+  if (age <= 5*MIN) return 'hot';
+  if (age <= 60*MIN) return 'cooling';
+  if (age <= 24*HR) return 'slow';
+  return 'stale';
+}
+const TIER_RANK = { hot:0, cooling:1, slow:2, stale:3, contacted:4 };
+
+/* ── pure: derived defect list (capped display handled in render) ── */
+function defectsOf(lead){ return (lead.defects||[]).map(code => ({code, label: DEFECTS[code] || code})); }
+
+/* ── channel verbs/labels. ig/fb are platform DMs (no SMS consent needed);
+   wa/sms are SMS-class and gated on marketing consent (Belcara P0). ── */
+const CHANNEL_VERB  = { ig:'Reply on Instagram', fb:'Reply on Messenger', wa:'Send WhatsApp', sms:'Send SMS', em:'Send email', call:'Call now' };
+const CHANNEL_LABEL = { ig:'Instagram', fb:'Messenger', wa:'WhatsApp', sms:'SMS', em:'Email', call:'phone' };
+const MESSAGE_CHANNELS = ['ig','fb','wa','sms','em'];
+
+/* pure: pick the channel a coordinator should contact this lead on. People
+   reply where they came from, so source drives the default; we fall back
+   through reachable channels and gate SMS-class transports on consent.
+   Result is mostly MESSAGES — calls only where messaging isn't viable. */
+function suggestedChannel(lead){
+  const canCall  = !!(lead.phone && lead.phoneValid);
+  const canSms   = canCall && lead.smsConsent;          // SMS + WhatsApp
+  const canEmail = !!(lead.email && lead.emailStatus === 'ok');
+  const order = {
+    instagram: ['ig','em','wa','call'],
+    facebook:  ['fb','em','wa','call'],
+    website:   ['em','wa','sms','call'],
+    katie:     ['wa','em','sms','call'],
+    referral:  ['wa','em','call','sms'],
+    walkin:    ['sms','call','em'],
+    phone:     ['call','sms','em'],
+    unknown:   ['em','wa','call'],
+  }[lead.source] || ['em','wa','call'];
+  const reachable = ch =>
+    ch === 'ig'  ? lead.source === 'instagram' :
+    ch === 'fb'  ? lead.source === 'facebook'  :
+    ch === 'wa'  ? canSms :
+    ch === 'sms' ? canSms :
+    ch === 'em'  ? canEmail :
+    ch === 'call'? canCall : false;
+  for (const ch of order){ if (reachable(ch)) return ch; }
+  if (canCall) return 'call';
+  return null;
+}
+
+function firstName(l){ return (l.name||'there').split(/[\s_]/)[0].replace(/^@/,'') || 'there'; }
+function interestsOf(l){ return (l.interests && l.interests.length) ? l.interests : (l.interest ? [l.interest] : []); }
+/* "tummy tuck and breast augmentation" / "your treatment" — for message + thread copy */
+function interestPhrase(l){ const a = interestsOf(l).map(s=>s.toLowerCase()); return a.length===0 ? 'your treatment' : a.length===1 ? a[0] : a.slice(0,-1).join(', ')+' and '+a[a.length-1]; }
+
+/* ── patient-journey TASKS: recommended next steps that are neither a message
+   nor a call. They surface once a person is engaged, matched to where they are
+   in the journey. Prototype side-effects live in completeTask(). ── */
+const TASK_META = {
+  consult:    { label:'Book consultation',           desc:'They’re ready to talk to a surgeon — set up a consultation.',                                       verb:'Book consultation' },
+  forms:      { label:'Send health declaration',     desc:'Send the health-declaration link so the surgeon can review their history before the consult.',       verb:'Send declaration' },
+  silhouette: { label:'Share Silhouette simulation', desc:'Share a personalised 3D Silhouette simulation so they can picture the result and decide.',           verb:'Open Silhouette' },
+};
+function nextPatientTask(lead){
+  if (lead.status === 'uncontacted') return null;   // first contact is a message, not a task
+  // Pre-op onward, the consult + paperwork are already behind them (per the stage
+  // meanings) — don't suggest booking a consult or sending forms for those people.
+  if (['preop','surgery','recover','longterm'].includes(lead.stage)) return null;
+  const s = lead.setup || {};
+  if (lead.stage === 'decide' && s.consultBooked && !s.silhouetteShared)
+    return { kind:'task', task:'silhouette', label:TASK_META.silhouette.label };
+  if (!s.consultBooked)
+    return { kind:'task', task:'consult', label:TASK_META.consult.label };
+  if (!s.formsReturned && !s.declarationSent)
+    return { kind:'task', task:'forms', label:TASK_META.forms.label };
+  return null;
+}
+
+/* ── pure: suggested next action by role, degrading on dirty data ── */
+function suggestedAction(lead, role){
+  role = role || 'coordinator';
+
+  if (role === 'support'){
+    const a = lead.automation || {};
+    if (a.state === 'failed')  return {label:'Open delivery log', kind:'diag'};
+    if (a.state === 'blocked') return {label:'Re-run audit', kind:'diag'};
+    if (a.state === 'queued')  return {label:'Resume sequence', kind:'diag'};
+    return {label:'View delivery log', kind:'diag', ghost:true};
+  }
+
+  if (lead.isSpam) return {label:'Dismiss', kind:'dismiss', ghost:true};
+
+  if (role === 'onboarding'){
+    if (lead.stage === 'preop')    return {label:'Confirm booking', kind:'convert'};
+    if (lead.stage === 'decide')   return {label:'Convert to patient', kind:'convert'};
+    if (lead.stage === 'surgery' || lead.stage === 'recover' || lead.stage === 'longterm') return {label:'Open record', kind:'convert'};
+    if (lead.status === 'uncontacted') return {label:'Send intro', kind:'em', channel:'em'};
+    if (!lead.setup || !lead.setup.formsReturned) return {label:'Send forms', kind:'convert'};
+    return {label:'Create account', kind:'convert'};
+  }
+
+  /* coordinator */
+  if (lead.status === 'uncontacted'){
+    // speed-to-lead: reach out on the smart channel (mostly messages, few calls)
+    if (urgencyTier(lead) === 'stale') return {label:'Auto follow-up active', kind:'wait'};
+    const ch = suggestedChannel(lead);
+    if (!ch) return {label:'No reachable channel', kind:'disabled'};
+    return { label: CHANNEL_VERB[ch], kind: ch, channel: ch };
+  }
+  // engaged — recommend the real journey step (a task) when there is one
+  const task = nextPatientTask(lead);
+  if (task) return task;
+  if (lead.status === 'replied') return {label:'Reply now', kind:'reply', channel:lead.preferredChannel};
+  if (lead.status === 'closed')  return {label:'Reopen', kind:'reply', ghost:true, channel:lead.preferredChannel};
+  if (lead.status === 'snoozed') return {label:'Resume', kind:'reply', ghost:true, channel:lead.preferredChannel};
+  const fch = suggestedChannel(lead) || 'em';
+  return { label:'Follow up', kind:fch, channel:fch };
+}
+
+/* pure: a generated, personalized first message for the composer. Tone is
+   tuned per channel (DM/SMS short; email a touch fuller). `variant` rotates
+   the opener so "Regenerate" visibly changes the draft. Sentence case. */
+function genMessage(lead, channel, variant){
+  variant = variant || 0;
+  const first = firstName(lead);
+  const proc = (lead.interest || '').toLowerCase();
+  const about = proc ? `about ${proc}` : `about getting started`;
+  const isReply = lead.status !== 'uncontacted' || (lead.threadLen || 0) > 3;   // they have an ongoing thread
+  if (channel === 'em'){
+    const emails = isReply ? [
+      `Hi ${first},\n\nThanks for getting back to me — lovely to hear from you. I'm happy to help with the next step whenever you're ready; just say the word and I'll take care of it.\n\nWarmly,\nThe Adoreal team`,
+      `Hi ${first},\n\nGreat to hear from you again. Let's keep things moving at a pace that suits you — would you like me to line up the next step now?\n\nWarmly,\nThe Adoreal team`,
+    ] : [
+      `Hi ${first},\n\nThanks so much for reaching out ${about} — I'd love to help you explore it. We can talk you through what's involved, recovery, and pricing with no pressure at all.\n\nWould a quick call this week suit you, or shall I share a few details here first?\n\nWarmly,\nThe Adoreal team`,
+      `Hi ${first},\n\nLovely to hear from you ${about}. Every journey starts with a relaxed, no-obligation chat — we'll answer your questions and only move at your pace.\n\nIs there a day this week that works for a short call?\n\nWarmly,\nThe Adoreal team`,
+    ];
+    return emails[variant % emails.length];
+  }
+  const dms = isReply ? [
+    `Hi ${first}! Thanks for getting back to me 🤍 Happy to help with the next step — shall I set that up for you?`,
+    `Hi ${first}! Lovely to hear from you again. Want me to sort the next step now, or is there anything else I can answer first?`,
+  ] : [
+    `Hi ${first}! Thanks for reaching out ${about} 🤍 I'd love to help. Are you free for a quick chat, or shall I send a couple of times that work for you?`,
+    `Hi ${first}! So glad you got in touch ${about}. No pressure at all — would you like me to share a few options, or is now a good moment for a quick call?`,
+  ];
+  return dms[variant % dms.length];
+}
+
+/* pure: the conversation thread. We synthesise a realistic, deterministic
+   history — oldest→newest — so the coordinator can scroll back through the whole
+   exchange inline (no need to open the inbox just to read context). The most
+   recent messages are stage-coherent (they line up with the recommended next
+   step); older ones are earlier touch-points mixed with logged calls + system
+   sends, like the live thread. Empty for uncontacted people. */
+const THREAD_FILL_OUT = [
+  `Just following up — are you still keen to explore your options?`,
+  `No rush at all, I'm here whenever you're ready 🤍`,
+  `Happy to answer any questions in the meantime.`,
+  `Wanted to check this didn't get buried — shall we find a time for a quick chat?`,
+  `We've got some availability next week if that helps.`,
+];
+const THREAD_FILL_IN = [
+  `Sorry for the slow reply!`,
+  `Thanks — still thinking it over.`,
+  `Could you remind me roughly on the pricing?`,
+  `Yes, still interested 🙂`,
+  `It's been a busy few weeks, apologies.`,
+];
+const THREAD_FILL_LOG = [
+  `Auto welcome email + SMS sent`,
+  `Day-3 nudge sent automatically`,
+  `Called — no answer, left voicemail`,
+  `Re-engagement touch-point sent`,
+  `Note: asked to be called back after 5pm`,
+];
+/* the latest, still-unanswered inbound — why this person is in the reply queue */
+const THREAD_UNANSWERED = [
+  `So — what's the next step? I'm really keen to get booked in.`,
+  `Sorry to chase! Do you have any availability this week?`,
+  `Could you let me know roughly on cost? Trying to plan ahead 🙂`,
+  `Is it possible to speak to someone today?`,
+  `Still hoping to hear back — thank you!`,
+];
+function threadHash(id){ return (Math.imul(id || 1, 2654435761)) >>> 0; }
+function threadTotal(lead){ return 16 + (threadHash(lead.id) % 22); }   // 16..37 messages
+/* the most recent, stage-coherent messages (newest last) */
+function recentTail(lead){
+  const s = lead.setup || {};
+  const proc = (interestsOf(lead)[0] || 'your treatment').toLowerCase();
+  const m = (dir, text) => ({ dir, text });
+  if (lead.stage === 'decide' && s.consultBooked && !s.silhouetteShared)
+    return [m('in',`Thank you! I had my consultation and I'm seriously considering going ahead.`),m('out',`That's wonderful to hear. How are you feeling about it so far?`),m('in',`Honestly, I'm just trying to picture what the result might actually look like on me.`),m('out',`Completely understandable — that's the biggest question at this stage.`)];
+  if (!s.consultBooked)
+    return [m('in',`I'd mainly like to understand the cost and how long recovery takes.`),m('out',`Of course. Pricing is tailored in a consultation, and recovery for ${proc} is usually a week or two. The best next step is a relaxed, no-obligation consult with one of our surgeons.`),m('in',`That sounds good — how do I book one?`)];
+  if (!s.formsReturned && !s.declarationSent)
+    return [m('in',`Thanks so much — I'm all set for my consultation!`),m('out',`Lovely! Before we meet, we just need your health declaration completed so the surgeon can review your history.`),m('in',`Happy to. Where do I find it?`)];
+  return [m('in',`Thank you for the info — that's really helpful.`),m('out',`Any time! Is there anything else I can answer for you?`),m('in',`Not for now — I'll have a think and come back to you.`)];
+}
+function fullThread(lead){
+  const f = firstName(lead), phrase = interestPhrase(lead);
+  const srcLabel = (SOURCES[lead.source] || SOURCES.unknown).label;
+  const m = (dir, text) => ({ dir, text });
+  if (lead.status === 'uncontacted'){
+    // they reached out via a channel and we HAVEN'T replied yet — the thread is
+    // their unanswered message(s) (most recent at the bottom); the composer below
+    // is our reply. This is WHY they're waiting. Length is set per lead
+    // (lead.threadLen): the top of the list carries rich, scrollable histories;
+    // most new enquiries are a single message. It ALWAYS ends on an unanswered
+    // inbound (their latest message).
+    const L = Math.max(1, lead.threadLen || 2);
+    if (lead.source === 'phone' || lead.source === 'walkin'){
+      // no chat bubbles — a logged call/walk-in enquiry
+      return L <= 1 ? [m('log', `${srcLabel} enquiry — interested in ${phrase}`)]
+                    : [m('log', `Enquiry received via ${srcLabel}`), m('log', `${srcLabel} enquiry — interested in ${phrase}`)];
+    }
+    const enquiry = m('in', `Hi, I saw your page and I'm interested in ${phrase}.`);
+    if (L <= 1) return [enquiry];                                  // brand-new single message
+    const out = [ m('log', `Enquiry received via ${srcLabel}`), enquiry ];
+    const h = threadHash(lead.id);
+    while (out.length < L){
+      const i = out.length;
+      if (i === L - 1)      out.push(m('in',  THREAD_UNANSWERED[(h + i) % THREAD_UNANSWERED.length]));  // ends unanswered
+      else if (i % 6 === 5) out.push(m('log', THREAD_FILL_LOG[(h + i) % THREAD_FILL_LOG.length]));
+      else if (i % 2 === 0) out.push(m('out', THREAD_FILL_OUT[(h + i * 3) % THREAD_FILL_OUT.length]));
+      else                  out.push(m('in',  THREAD_FILL_IN[(h + i * 5) % THREAD_FILL_IN.length]));
+    }
+    return out;
+  }
+  const head = [
+    m('log', `Enquiry received via ${srcLabel}`),
+    m('in',  `Hi, I saw your page and I'm interested in ${phrase}.`),
+    m('out', `Hi ${f}! Thanks for reaching out 🤍 I'd love to help — what would you like to know?`),
+  ];
+  const tail = recentTail(lead);
+  const total = Math.max(head.length + tail.length, threadTotal(lead));
+  const fillerN = total - head.length - tail.length;
+  const h = threadHash(lead.id);
+  const filler = [];
+  for (let i = 0; i < fillerN; i++){
+    if (i % 4 === 3)      filler.push(m('log', THREAD_FILL_LOG[(h + i) % THREAD_FILL_LOG.length]));
+    else if (i % 2 === 0) filler.push(m('out', THREAD_FILL_OUT[(h + i * 3) % THREAD_FILL_OUT.length]));
+    else                  filler.push(m('in',  THREAD_FILL_IN[(h + i * 5) % THREAD_FILL_IN.length]));
+  }
+  return [...head, ...filler, ...tail];
+}
+function buildThread(lead){ return fullThread(lead); }   // alias for the test surface
+
+/* ── inbox deep-link ── */
+function inboxHref(lead, chan){
+  if (lead.inboxPatientId == null) return 'inbox.html';
+  const c = chan || lead.preferredChannel || 'wa';
+  return `inbox.html?patient=${lead.inboxPatientId}&chan=${c}`;
+}
+function actionHref(lead, act){
+  if (act.kind === 'call') return lead.inboxPatientId!=null ? `inbox.html?patient=${lead.inboxPatientId}&action=log-call` : 'inbox.html';
+  // message channels (ig/fb/wa/sms/em) — open the inbox on that channel
+  if (MESSAGE_CHANNELS.includes(act.kind)) return inboxHref(lead, act.kind);
+  if (act.kind === 'reply') return inboxHref(lead, act.channel);
+  // Onboarding conversion verbs + Support diagnostic verbs both hand off to
+  // the inbox (Support read-only). Without this they rendered dead buttons.
+  if (act.kind === 'convert') return inboxHref(lead);
+  if (act.kind === 'diag') return lead.inboxPatientId!=null ? `inbox.html?patient=${lead.inboxPatientId}&chan=${lead.preferredChannel||'em'}` : 'inbox.html';
+  return null;
+}
+
+/* ── formatting ── */
+function fmtTimer(lead, now){
+  now = now || clock();
+  if (lead.status !== 'uncontacted' || lead.firstOutboundAt){
+    const t = lead.lastTouchAt || lead.firstOutboundAt || lead.arrivedAt;
+    // Only say "replied" when they actually replied; otherwise "contacted".
+    const verb = lead.status === 'replied' ? 'replied ' : 'contacted ';
+    return { contacted:true, text: verb + fmtShort(now - t) };
+  }
+  const age = now - lead.arrivedAt;
+  if (age <= 5*MIN){ const m=Math.floor(age/MIN), s=Math.floor((age%MIN)/1000); return {contacted:false, text:`${m}m ${String(s).padStart(2,'0')}s`}; }
+  return { contacted:false, text: fmtShort(age) };
+}
+function fmtShort(ms){
+  if (ms < MIN) return '<1m';
+  if (ms < HR) return Math.floor(ms/MIN)+'m';
+  if (ms < DAY) { const h=Math.floor(ms/HR), m=Math.floor((ms%HR)/MIN); return m?`${h}h ${m}m`:`${h}h`; }
+  return Math.floor(ms/DAY)+'d';
+}
+function maskPhone(p){ if(!p) return null; const d=p.replace(/[^\d]/g,''); return p.length>9 ? p.slice(0,9)+' ··· '+d.slice(-2) : p+' …'; }
+function initialsOf(lead){ const n=(lead.name||'').replace(/^@/,''); const parts=n.split(/[\s_.]+/).filter(Boolean); if(!parts.length) return '?'; return (parts[0][0]+(parts[1]?parts[1][0]:'')).toUpperCase(); }
+
+/* ── state ── */
+let role = localStorage.getItem('adoreal_lms_role') || 'coordinator';
+let filters = { search:'', urgency:'all', status:'all', source:'all', procedure:'all' };
+let page = 1, pageSize = 50;
+let realtimeOn = true;
+let pendingNew = 0;     // count for the "N new" pill when not at top of page 1
+let LEAD_INDEX = new Map();  // id → lead, for O(1) lookups in the 1s tick
+
+/* ── column templates per role (grid-template-columns) ── */
+/* One source of truth for each role's grid tracks. Track count MUST equal
+   the number of grid children rowHtml emits for that role:
+     coordinator (7): gutter person source interest status action end
+     onboarding  (9): gutter person source interest status stage setup action end
+     support     (6): gutter person source engine action end */
+const COLS = {
+  // gutter · person · stage · interest · value · [setup] · action · ›
+  coordinator: '92px 1.6fr 110px 1.1fr 96px 150px 34px',
+  onboarding:  '92px 1.45fr 108px 0.9fr 92px 64px 144px 34px',
+  support:     '92px 1.6fr 110px 1.2fr 150px 34px',
+};
+
+/* ── filtering + sorting (operates on full LEADS) ── */
+function passesFilters(lead){
+  const f = filters;
+  if (f.urgency !== 'all' && urgencyTier(lead) !== f.urgency) return false;
+  if (f.status !== 'all' && lead.status !== f.status) return false;
+  if (f.source !== 'all' && lead.source !== f.source) return false;
+  if (f.procedure !== 'all' && !interestsOf(lead).includes(f.procedure)) return false;
+  if (f.search){
+    const q = f.search.toLowerCase();
+    const hay = [lead.name, lead.phone, lead.email, lead.interest].map(x=>String(x||'').toLowerCase()).join(' ');
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+function sortedFiltered(){
+  const now = clock();
+  return LEADS.filter(passesFilters).sort((a,b)=>{
+    const ta = urgencyTier(a,now), tb = urgencyTier(b,now);
+    const ra = TIER_RANK[ta], rb = TIER_RANK[tb];
+    if (ra !== rb) return ra - rb;                 // hottest tier first
+    if (ta === 'contacted')                        // within contacted: most recent activity first
+      return (b.lastTouchAt||b.arrivedAt) - (a.lastTouchAt||a.arrivedAt);
+    return a.arrivedAt - b.arrivedAt;              // within uncontacted tiers: longest-waiting first
+  });
+}
+
+/* ── render: the whole view ── */
+function render(){
+  document.body.dataset.role = role;
+  document.documentElement.style.setProperty('--cols', COLS[role]);
+  renderRoleSwitcher();
+  renderContext();
+  if (role === 'onboarding'){
+    // the onboarding role is the clinic SETUP console, not a leads list
+    $('context-summary').innerHTML = `<span class="cs-strong">Belcara Health</span><span class="cs-sep">·</span>clinic setup`;
+    renderOnboarding();
+    return;
+  }
+  renderHead();
+  renderList();
+  syncSelection();   // keep/establish the auto-selected lead in the detail pane
+}
+
+function renderRoleSwitcher(){
+  document.querySelectorAll('.role-option').forEach(b => b.classList.toggle('active', b.dataset.role === role));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ONBOARDING SETUP CONSOLE — the clinic-configuration surface. In production
+   this is role-gated (onboarding specialist), not the coordinator's speed view.
+   Content mirrors the real product's Settings / Automations / Channels screens.
+   ══════════════════════════════════════════════════════════════════════════ */
+const ONB_SECTIONS = [
+  { key:'business',    label:'Business details', icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="8" y2="8.01"/><line x1="12" y1="8" x2="12" y2="8.01"/><line x1="8" y1="12" x2="8" y2="12.01"/><line x1="12" y1="12" x2="12" y2="12.01"/><path d="M9 21v-4h6v4"/></svg>' },
+  { key:'email',       label:'Email & domains',  icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>' },
+  { key:'automations', label:'Automations',      icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg>' },
+  { key:'channels',    label:'Lead channels',    icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>' },
+];
+let onbSection = 'business';
+let onbExpandedAuto = null;
+
+let ONB_VARS = [
+  {id:'v1', name:'Business name',        value:'Belcara Health'},
+  {id:'v2', name:'Business phone number', value:'(410) 296-0414'},
+  {id:'v3', name:'Booking URL',          value:'https://www.belcarahealth.com/book-online/'},
+  {id:'v4', name:'Homepage',             value:'https://www.belcarahealth.com/'},
+  {id:'v5', name:'About us',             value:'https://www.belcarahealth.com/about/medical-team/'},
+  {id:'v6', name:'Testimonials',         value:'https://www.belcarahealth.com/testimonials/'},
+];
+let onbVarSeq = 6, onbEditingVar = null, onbVarMenuOpen = null, onbVarSaved = null;
+/* {{token}} derived from the variable name — what you drop into a template */
+function tokenOf(name){ return '{{' + (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') + '}}'; }
+const ONB_HOURS = [
+  ['Sunday',false,'09:00am','05:00pm'],['Monday',true,'08:00am','05:00pm'],
+  ['Tuesday',true,'08:00am','05:00pm'],['Wednesday',true,'08:00am','05:00pm'],
+  ['Thursday',true,'08:00am','05:00pm'],['Friday',true,'09:00am','01:00pm'],
+  ['Saturday',false,'09:00am','05:00pm'],
+];
+const ONB_DOMAINS = [
+  {name:'belcarahealth.com', status:'ok'},
+  {name:'drcohenplasticsurgery.com', status:'ok'},
+  {name:'mail.belcarahealth.com', status:'pending'},
+];
+const ONB_AUTOMATIONS = [
+  {group:'Incoming', items:[
+    {id:'ack-email', name:'Acknowledgement email', runs:113, live:true, kind:'email'},
+    {id:'ack-sms',   name:'Acknowledgement SMS',   runs:97,  live:true, kind:'sms'},
+    {id:'ig-fb',     name:'Instagram / Facebook',  runs:2,   live:true, kind:'dm'},
+  ]},
+  {group:'Contact points 1–3 (Follow up)', items:[
+    {id:'cp1', name:'Contact point 1', runs:94, live:true, kind:'email'},
+    {id:'cp2', name:'Contact point 2', runs:91, live:true, kind:'sms'},
+    {id:'cp3', name:'Contact point 3', runs:91, live:true, kind:'email'},
+  ]},
+  {group:'Contact points 4–5 (Follow up 2)', items:[
+    {id:'cp4', name:'Contact point 4', runs:45, live:true,  kind:'sms'},
+    {id:'cp5', name:'Contact point 5', runs:38, live:false, kind:'email'},
+  ]},
+];
+const CHAN_ICO = {
+  instagram:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>',
+  facebook:'<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 9H16V6h-2.5C11.6 6 10 7.6 10 9.5V11H8v3h2v7h3v-7h2.2l.3-3H13V9.6c0-.3.2-.6.5-.6z"/></svg>',
+  fbleadads:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 10v3l11 5V5L3 10z"/><path d="M14 8a3.5 3.5 0 0 1 0 7"/></svg>',
+  whatsapp:'<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-7.7 13.7L3 21l4.4-1.2A9 9 0 1 0 12 3zm0 2a7 7 0 1 1-3.7 12.9l-.4-.2-2.3.6.6-2.2-.3-.4A7 7 0 0 1 12 5zm-2.3 3.2c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.8 2.2.8 2.6.7 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2-.1-.1-.3-.2-.6-.4-.3-.2-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1-.2.3-.6.8-.8.9-.1.2-.3.2-.5.1-.3-.1-1.1-.4-2-1.2-.7-.6-1.2-1.4-1.4-1.7-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.5-.4z"/></svg>',
+  chatbot:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4.5"/><circle cx="9.5" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="14" r="1" fill="currentColor" stroke="none"/></svg>',
+};
+const ONB_CHANNELS = [
+  {key:'instagram', name:'Instagram accounts', desc:'Receive and respond to Instagram messages.', connected:true,  color:'#B1785F'},
+  {key:'facebook',  name:'Facebook Pages',     desc:'Connect a Facebook Page to receive and reply to messages.', connected:true,  color:'#5A8DB8'},
+  {key:'fbleadads', name:'Facebook Lead Ads',  desc:'Collect and respond directly to Facebook Lead Ads.', connected:false, color:'#5A8DB8'},
+  {key:'whatsapp',  name:'WhatsApp',           desc:'Receive and reply to messages from your WhatsApp number.', connected:false, color:'#25A366'},
+  {key:'chatbot',   name:'Website chatbot',    desc:'Create and connect your website chatbot.', connected:false, color:'#965E47'},
+];
+
+function renderOnboarding(){
+  const p = $('onb-panel');
+  const keep = p.scrollTop;
+  $('onb-nav').innerHTML = ONB_SECTIONS.map(s =>
+    `<button class="${s.key===onbSection?'active':''}" data-onb="${s.key}" onclick="setOnbSection('${s.key}')">${s.icon}${esc(s.label)}</button>`).join('')
+    + `<div class="onb-nav-note">In production this surface is role-gated — clinic setup sits with the onboarding specialist, not the coordinator's speed-to-lead view.</div>`;
+  p.innerHTML = onbSection==='business' ? onbBusiness()
+    : onbSection==='email' ? onbEmail()
+    : onbSection==='automations' ? onbAutomations()
+    : onbChannels();
+  p.scrollTop = keep;
+}
+function setOnbSection(k){ onbSection = k; onbExpandedAuto = null; renderOnboarding(); const p=$('onb-panel'); if(p) p.scrollTop = 0; }
+
+function onbBusiness(){
+  const vars = ONB_VARS.map(varRowHtml).join('');
+  const hours = ONB_HOURS.map((h,i)=>{
+    const [day,open,from,to]=h;
+    return `<div class="hours-row${open?'':' closed'}">
+      <span class="hours-day">${esc(day)}</span>
+      <span class="hours-state"><label class="tgl"><input type="checkbox" ${open?'checked':''} onchange="onbToggleDay(${i},this.checked)"><span class="tgl-track"><span class="tgl-knob"></span></span></label>${open?'Open':'Closed'}</span>
+      <input class="hours-time" value="${esc(from)}" ${open?'':'disabled'}/>
+      <input class="hours-time" value="${esc(to)}" ${open?'':'disabled'}/>
+    </div>`;
+  }).join('');
+  return `
+    <div class="onb-h1">Business details</div>
+    <div class="onb-lede">These fill your automations and reply templates, so a message never goes out with an empty booking link or the wrong clinic name — the placeholder leaks Belcara flagged. Set them once here.</div>
+    <div class="onb-card">
+      <div class="onb-card-h">Custom variables</div>
+      <div class="onb-card-sub">Stored details you can drop into any automation or template — e.g. {{booking_url}}, {{business_phone}}.</div>
+      ${vars}
+      <button class="var-add" onclick="onbAddVar()">+ Add another field</button>
+    </div>
+    <div class="onb-card">
+      <div class="onb-card-h">Opening hours</div>
+      <div class="onb-card-sub">Used to hold or delay time-specific automations so nothing sends out of hours.</div>
+      ${hours}
+      <div style="margin-top:14px"><button class="onb-save" onclick="showToast('Opening hours saved')">Save</button></div>
+    </div>
+    <div class="onb-card">
+      <div class="onb-card-h">Brand &amp; currency</div>
+      <div class="onb-card-sub">The theme colour for shared pages, and the currency used to report on sales.</div>
+      <div class="onb-field"><div><div class="onb-field-k">Primary colour</div><div class="onb-field-sub">Used as the background on shared pages.</div></div>
+        <span class="color-input"><input value="#251546"/><span class="color-swatch" style="background:#251546"></span></span></div>
+      <div class="onb-field"><div><div class="onb-field-k">Default currency</div><div class="onb-field-sub">Used in boxes to calculate and report on sales.</div></div>
+        <span class="currency-pill">🇺🇸&nbsp; USD — US Dollar</span></div>
+    </div>`;
+}
+
+function onbEmail(){
+  const domains = ONB_DOMAINS.map(d => {
+    const ok = d.status==='ok';
+    return `<div class="dom-row" data-testid="onb-domain">
+      <span class="dom-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
+      <div><div class="dom-name">${esc(d.name)}</div>${ok?'':'<div class="dom-sub">Add the DNS records at your registrar — we verify automatically once they propagate.</div>'}</div>
+      ${ok?'<span class="dom-badge ok" data-testid="onb-domain-verified"><span class="db-dot"></span>Verified</span>'
+          :'<span class="dom-badge pending"><span class="db-dot"></span>Verifying DNS…</span><span class="dom-link" onclick="showToast(\'Showing DNS records — add these at your registrar\')">Show records</span>'}
+    </div>`;
+  }).join('');
+  const star = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.2 3.3L12.5 6.5 9.2 7.7 8 11 6.8 7.7 3.5 6.5 6.8 5.3 8 2z" fill="currentColor"/></svg>';
+  return `
+    <div class="onb-h1">Email &amp; domains</div>
+    <div class="onb-lede">Send from your own verified domain so emails land in the inbox, not spam.</div>
+    <div class="onb-card">
+      <div class="onb-card-h">Verify your email domain</div>
+      <div class="onb-card-sub">Verifying ownership of your email domain helps your emails make it into customer inboxes. <span class="dom-link">Learn more</span></div>
+      <ul class="benefit-list">
+        <li><span class="bl-ico">${star}</span>Improved deliverability</li>
+        <li><span class="bl-ico">${star}</span>Increased trust from customers</li>
+        <li><span class="bl-ico">${star}</span>Less risk of being flagged as spam</li>
+      </ul>
+      <button class="onb-save" onclick="showToast('Domain verification started')">+ Verify your domain</button>
+      <div class="ae-label" style="margin:20px 0 8px">Your email domains</div>
+      ${domains}
+    </div>
+    <div class="onb-card">
+      <div class="onb-card-h">Sender emails</div>
+      <div class="onb-card-sub">The addresses your automations send from.</div>
+      <div class="dom-row"><span class="dom-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span><div class="dom-name">enquiries@belcarahealth.com</div><span class="dom-badge ok"><span class="db-dot"></span>Active</span></div>
+      <div class="dom-row"><span class="dom-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span><div class="dom-name">hello@belcarahealth.com</div><span class="dom-badge ok"><span class="db-dot"></span>Active</span></div>
+    </div>`;
+}
+
+function onbAutomations(){
+  const groups = ONB_AUTOMATIONS.map(g =>
+    `<div class="auto-group-label">${esc(g.group)}</div>${g.items.map(automationRow).join('')}`).join('');
+  return `
+    <div class="onb-h1">Automations</div>
+    <div class="onb-lede">Automatically send emails, assign leads and follow up — so speed-to-lead never depends on someone remembering. Edits are reviewed before they go live.</div>
+    <div class="auto-head">
+      <div class="onb-card-h" style="margin:0">Automate repetitive things</div>
+      <button class="auto-add" onclick="showToast('New automation')">+ Automation</button>
+    </div>
+    ${groups}`;
+}
+function automationRow(a){
+  const edit = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+  const row = `<div class="auto-row${a.live?'':' paused'}" data-testid="onb-automation" data-auto="${a.id}">
+    <span class="auto-bolt"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></span>
+    <div class="auto-main" onclick="onbToggleExpand('${a.id}')">
+      <div class="auto-name">${esc(a.name)}</div>
+      <div class="auto-status"><span class="live-dot"></span>${a.live?`The automation is live and has run ${a.runs} times`:'Paused'}</div>
+    </div>
+    <button class="auto-icobtn" title="Edit" onclick="onbToggleExpand('${a.id}')">${edit}</button>
+    <label class="tgl" title="${a.live?'Live':'Paused'}"><input type="checkbox" ${a.live?'checked':''} onclick="event.stopPropagation()" onchange="onbToggleLive('${a.id}',this.checked)"><span class="tgl-track"><span class="tgl-knob"></span></span></label>
+    <button class="auto-icobtn" title="More">⋯</button>
+  </div>`;
+  return onbExpandedAuto === a.id ? row + automationExpand(a) : row;
+}
+function automationExpand(a){
+  const isEmail = a.kind === 'email';
+  const subject = isEmail ? `<div class="ae-field"><div class="ae-label">Subject</div><input class="ae-input" value="Thanks for your enquiry, {{first_name}} 🤍"/></div>` : '';
+  const bodyText = isEmail
+    ? `Hi {{first_name}},\n\nThanks for reaching out to {{business_name}} about {{interest}}. A member of our team will be in touch very shortly to talk you through the next steps.\n\nWhenever you're ready, you can book a consultation here: {{booking_url}}\n\nWarmly,\nThe {{business_name}} team`
+    : `Hi {{first_name}}, thanks for reaching out to {{business_name}}! A member of our team will be in touch shortly. Book any time: {{booking_url}}`;
+  const body = `<div class="ae-field"><div class="ae-label">Message</div><textarea class="ae-textarea" data-testid="onb-auto-body">${esc(bodyText)}</textarea></div>`;
+  const foot = `<div class="ae-foot"><button class="onb-save" data-testid="onb-save-review" onclick="showToast('Saved as draft — queued for review before it goes live')">Save for review</button><button class="onb-save ghost" onclick="onbToggleExpand('${a.id}')">Cancel</button><span class="ae-hint">Changes are reviewed before they go live.</span></div>`;
+  return `<div class="auto-expand" data-testid="onb-auto-expand">${subject}${body}${foot}${isEmail?abComparison():''}</div>`;
+}
+function abComparison(){
+  return `<div class="ab-wrap" data-testid="onb-ab">
+    <div class="ab-title">Compare variants</div>
+    <div class="ab-sub">Run more than one version of this automation to see which lands and converts better.</div>
+    <div class="ab-grid">
+      <div class="ab-card"><div class="ab-card-h"><span class="ab-name">Variant A</span></div>
+        <div class="ab-metric">Delivered<b>98.2%</b></div><div class="ab-metric">Click-through<b>24%</b></div><div class="ab-metric">Sent<b>1,240</b></div></div>
+      <div class="ab-card win"><div class="ab-card-h"><span class="ab-name">Variant B</span><span class="ab-win-tag">Winning</span></div>
+        <div class="ab-metric">Delivered<b>97.1%</b></div><div class="ab-metric">Click-through<b>31%</b></div><div class="ab-metric">Sent<b>1,236</b></div></div>
+    </div>
+    <button class="ab-add" onclick="showToast('Add a variant to A/B test')">+ Add a variant</button>
+  </div>`;
+}
+function onbChannels(){
+  const cards = ONB_CHANNELS.map(c =>
+    `<div class="chan-card${c.connected?' connected':''}" data-testid="onb-channel">
+      <span class="cc-ico" style="background:${c.color}">${CHAN_ICO[c.key]||''}</span>
+      <div class="cc-title">${esc(c.name)}</div>
+      <div class="cc-desc">${esc(c.desc)}</div>
+      ${c.connected
+        ? '<span class="cc-connected"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><polyline points="3,8 6.5,11.5 13,4.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>Connected</span>'
+        : `<button class="cc-btn" onclick="onbConnect('${c.key}')">Connect</button>`}
+    </div>`).join('');
+  return `
+    <div class="onb-h1">Lead channels</div>
+    <div class="onb-lede">Every channel a lead can reach you on, wired into one inbox. A new enquiry from any of these lands in the coordinator's list and starts the speed-to-lead clock automatically.</div>
+    <div class="chan-grid">${cards}</div>`;
+}
+/* onboarding interactions */
+function onbToggleExpand(id){ onbExpandedAuto = (onbExpandedAuto===id) ? null : id; renderOnboarding(); }
+function onbToggleLive(id, on){ ONB_AUTOMATIONS.forEach(g => g.items.forEach(a => { if (a.id===id) a.live = on; })); renderOnboarding(); }
+function onbToggleDay(i, on){ ONB_HOURS[i][1] = on; renderOnboarding(); }
+function onbConnect(key){ ONB_CHANNELS.forEach(c => { if (c.key===key) c.connected = true; }); showToast('Channel connected'); renderOnboarding(); }
+
+/* ── custom variables: read-only rows, edited/copied/deleted via the ⋯ menu ── */
+function varRowHtml(v){
+  if (onbEditingVar === v.id){
+    return `<div class="var-row editing" data-var="${v.id}" data-testid="onb-var">
+      <input class="var-edit var-edit-name" id="var-name-${v.id}" value="${esc(v.name)}" placeholder="Name" aria-label="Variable name"/>
+      <span class="var-arrow">→</span>
+      <input class="var-edit var-edit-val" id="var-val-${v.id}" value="${esc(v.value)}" placeholder="Value" aria-label="Variable value"/>
+      <button class="var-save" data-testid="onb-var-save" onclick="saveVar('${v.id}')">Save</button>
+      <button class="var-cancel" onclick="cancelVar()">Cancel</button>
+    </div>`;
+  }
+  const saved = onbVarSaved === v.id ? `<span class="var-saved" data-testid="onb-var-saved">✓ Saved</span>` : '';
+  const valHtml = v.value ? esc(v.value) : '<span class="var-empty">Not set</span>';
+  return `<div class="var-row" data-var="${v.id}" data-testid="onb-var">
+    <div class="var-name"><span class="var-label">${esc(v.name)||'<span class="var-empty">Unnamed</span>'}</span><code class="var-token">${esc(tokenOf(v.name))}</code></div>
+    <span class="var-arrow">→</span>
+    <div class="var-value" data-testid="onb-var-value">${valHtml}${saved}</div>
+    <div class="var-menu-wrap">
+      <button class="var-menu-btn" aria-label="Variable actions" data-testid="onb-var-menu-btn" onclick="event.stopPropagation();toggleVarMenu('${v.id}')">⋯</button>
+      <div class="var-menu${onbVarMenuOpen===v.id?' open':''}" data-testid="onb-var-menu">
+        <button onclick="editVar('${v.id}')">Edit</button>
+        <button onclick="copyVarToken('${v.id}')">Copy token</button>
+        <button onclick="copyVarValue('${v.id}')">Copy value</button>
+        <button class="danger" onclick="deleteVar('${v.id}')">Delete</button>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleVarMenu(id){ onbVarMenuOpen = (onbVarMenuOpen===id) ? null : id; renderOnboarding(); }
+function closeVarMenu(){ if (onbVarMenuOpen){ onbVarMenuOpen = null; renderOnboarding(); } }
+function editVar(id){ onbEditingVar = id; onbVarMenuOpen = null; renderOnboarding(); const el = document.getElementById('var-name-'+id); if (el) el.focus(); }
+function cancelVar(){ onbEditingVar = null; renderOnboarding(); }
+function saveVar(id){
+  const nameEl = document.getElementById('var-name-'+id), valEl = document.getElementById('var-val-'+id);
+  const v = ONB_VARS.find(x => x.id === id); if (!v) return;
+  v.name = (nameEl && nameEl.value.trim()) || v.name;
+  v.value = valEl ? valEl.value.trim() : v.value;
+  onbEditingVar = null; onbVarSaved = id;
+  renderOnboarding();
+  showToast(`“${v.name}” updated`);
+  setTimeout(() => { if (onbVarSaved === id){ onbVarSaved = null; if (role === 'onboarding' && onbSection === 'business') renderOnboarding(); } }, 1800);
+}
+function deleteVar(id){
+  const v = ONB_VARS.find(x => x.id === id);
+  ONB_VARS = ONB_VARS.filter(x => x.id !== id);
+  onbVarMenuOpen = null;
+  renderOnboarding();
+  if (v) showToast(`“${v.name}” deleted`);
+}
+function copyVarToken(id){
+  const v = ONB_VARS.find(x => x.id === id); if (!v) return;
+  const t = tokenOf(v.name);
+  try { navigator.clipboard && navigator.clipboard.writeText(t); } catch(e){}
+  onbVarMenuOpen = null; renderOnboarding();
+  showToast(`Copied ${t}`);
+}
+function copyVarValue(id){
+  const v = ONB_VARS.find(x => x.id === id); if (!v) return;
+  try { navigator.clipboard && navigator.clipboard.writeText(v.value); } catch(e){}
+  onbVarMenuOpen = null; renderOnboarding();
+  showToast(`Copied “${v.value}”`);
+}
+function onbAddVar(){ const id = 'v' + (++onbVarSeq); ONB_VARS.push({id, name:'', value:''}); onbEditingVar = id; onbVarMenuOpen = null; renderOnboarding(); const el = document.getElementById('var-name-'+id); if (el) el.focus(); }
+/* close an open variable menu when clicking elsewhere */
+document.addEventListener('click', e => { if (onbVarMenuOpen && !e.target.closest('.var-menu-wrap')) closeVarMenu(); });
+
+function renderHead(){
+  let cells;
+  if (role === 'onboarding') cells = ['Waiting','','Stage','Interest','<span class="lh-right">Value</span>','Setup','Suggested action',''];
+  else if (role === 'support') cells = ['Waiting','','Stage','Last automation','Suggested action',''];
+  else cells = ['Waiting','','Stage','Interest','<span class="lh-right">Value</span>','Suggested action',''];
+  // --cols is set once in render() from the single COLS source of truth — no override here.
+  $('leads-head').innerHTML = cells.map(c => `<span>${c}</span>`).join('');
+}
+
+function renderContext(){
+  const now = clock();
+  const total = LEADS.length;
+  const uncontacted = LEADS.filter(l => l.status==='uncontacted' && !l.firstOutboundAt).length;
+  const needNow = LEADS.filter(l => urgencyTier(l,now)==='hot').length;
+  const fmtN = n => n.toLocaleString('en-US');
+  $('context-summary').innerHTML =
+    `<span class="cs-strong">${fmtN(total)}</span> people` +
+    `<span class="cs-sep">·</span>${fmtN(uncontacted)} uncontacted` +
+    `<span class="cs-sep">·</span><span class="cs-now">${needNow} need you now</span>`;
+  // pending dropdown mirrors the same source of truth
+  $('pending-count').textContent = fmtN(uncontacted);
+  $('pending-overdue').textContent = needNow;
+  $('pending-dot').classList.toggle('has-pending', needNow > 0);
+  $('filter-clear').style.display = (filters.search||filters.urgency!=='all'||filters.status!=='all'||filters.source!=='all'||filters.procedure!=='all') ? '' : 'none';
+}
+
+function renderList(){
+  const rows = sortedFiltered();
+  const totalRows = rows.length;
+  const pages = Math.max(1, Math.ceil(totalRows / pageSize));
+  if (page > pages) page = pages;
+  const start = (page-1)*pageSize;
+  const slice = rows.slice(start, start+pageSize);
+  const now = clock();
+
+  $('leads-body').innerHTML = slice.length ? slice.map(l => rowHtml(l, now)).join('')
+    : `<div style="padding:40px;text-align:center;color:var(--g6)">No leads match these filters.</div>`;
+  $('leads-body').querySelectorAll('.lead-row').forEach(r => {
+    r.addEventListener('click', e => {
+      if (e.target.closest('a,button,select')) return;
+      selectLead(parseInt(r.dataset.leadId,10));
+    });
+  });
+
+  // pagination
+  const from = totalRows ? start+1 : 0, to = Math.min(start+pageSize, totalRows);
+  $('pagination-summary').textContent = `Showing ${from.toLocaleString('en-US')}–${to.toLocaleString('en-US')} of ${totalRows.toLocaleString('en-US')} people`;
+  renderPager(pages);
+}
+
+function rowHtml(l, now){
+  const tier = urgencyTier(l, now);
+  const tm = fmtTimer(l, now);
+  const act = suggestedAction(l, role);
+  const defs = defectsOf(l);
+
+  // timer cell
+  const timerCell = tm.contacted
+    ? `<span class="lead-timer contacted" data-testid="lead-urgency-timer"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><polyline points="3,8 6.5,11.5 13,4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(tm.text)}</span>`
+    : `<span class="lead-timer" data-testid="lead-urgency-timer">${esc(tm.text)}</span>`;
+
+  // person sub-line: channel · source · masked contact + at most ONE inline defect chip
+  const chips = [];
+  if (l.defects.includes('no_consent')) chips.push('<span class="lead-defect-chip consent">no SMS consent</span>');
+  else if (l.phone===null) chips.push('<span class="lead-defect-chip">no phone</span>');
+  else if (l.duplicateOf || l.defects.includes('duplicate')) chips.push('<span class="lead-defect-chip dupe">possible duplicate</span>');
+  const extraDefects = defs.length - (chips.length?1:0);
+  const moreChip = extraDefects > 0 && chips.length ? `<span class="lead-defect-chip">${extraDefects} more</span>` : (defs.length>1 && !chips.length ? `<span class="lead-defect-chip">${defs.length} issues</span>` : '');
+  const bounce = l.emailStatus==='bounced' ? '<span class="bounce-dot" title="Email bounced"></span>' : '';
+  const contact = l.phone ? maskPhone(l.phone) : (l.email && l.emailStatus==='ok' ? l.email : 'no contact');
+  // source lives in the detail pane now (founder: "it shows on the right which is
+  // enough"); the sub-line keeps just how to reach them.
+  const sub = `${bounce}${esc(contact)}`;
+
+  const ints = interestsOf(l);
+  const interestCell = role==='support'
+    ? `<span class="lead-engine">${engineHtml(l)}</span>`
+    : `<span class="lead-interest${ints.length?'':' blank'}" data-testid="lead-interest" title="${esc(ints.join(', '))}">${ints.length ? esc(ints[0]) + (ints.length>1?`<span class="int-more">+${ints.length-1}</span>`:'') : '—'}</span>`;
+
+  // suggested action — QUIET hint in the row (the prominent Send is in the
+  // detail pane for the selected lead). Most are messages, few are calls.
+  const actEl = actionHintHtml(act);
+
+  // estimated deal size — sales roles (coordinator/onboarding) prioritise by it
+  const valueCell = `<span class="lead-value${l.value?'':' none'}" data-testid="lead-value">${fmtMoney(l.value)}</span>`;
+
+  // role-specific middle cells (Status + per-row Reply dropped — both repeated
+  // identically and added no signal; the row click opens the reply pane)
+  const stageCell = `<span class="lead-stage" data-testid="stage-cell">${stageChip(l)}</span>`;
+  let midCells;
+  if (role==='onboarding'){
+    const setupDots = ['accountCreated','formsReturned','consultBooked'].map(k => `<span class="setup-dot${l.setup&&l.setup[k]?' on':''}"></span>`).join('');
+    midCells = stageCell + interestCell + valueCell + `<span class="lead-setup" data-testid="setup-cell">${setupDots}</span>`;
+  } else if (role==='support'){
+    midCells = stageCell + interestCell;
+  } else {
+    midCells = stageCell + interestCell + valueCell;
+  }
+
+  return `
+  <div class="lead-row${l.id===selectedId?' selected':''}" data-lead-id="${l.id}" data-testid="lead-row" data-urgency="${tier}" data-dirty="${l.defects.length?'1':'0'}">
+    <span class="lead-gutter">${timerCell}</span>
+    <span class="lead-person">
+      <span class="lead-av${l.nameQuality==='junk'?' dim':''}">${esc(initialsOf(l))}</span>
+      <span class="lead-person-main">
+        <span class="lead-name${l.nameQuality!=='ok'?' dirty':''}" data-testid="lead-name">${esc(l.name||'Unknown')}</span>
+        <span class="lead-sub">${sub} ${chips.join('')} ${moreChip}</span>
+      </span>
+    </span>
+    ${midCells}
+    <span class="lead-action">${actEl}</span>
+    <span class="lead-end"><button class="lead-more" onclick="event.stopPropagation();selectLead(${l.id})" aria-label="Open conversation">›</button></span>
+  </div>`;
+}
+
+/* Quiet per-row action hint (icon + channel/verb). Calls are blue, messages
+   nude, wait/disabled muted grey. Non-interactive — the row click selects. */
+const TASK_ICON = {
+  consult:    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3.5" width="11" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h11M5.5 2v2M10.5 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  forms:      '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 2.5h5l3 3V13a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 13V3a.5.5 0 0 1 .5-.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 2.5v3h3M6 9h4M6 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  silhouette: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2.3l1.25 2.95L12.2 6.5 9.25 7.75 8 10.7 6.75 7.75 3.8 6.5l2.95-1.25L8 2.3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+};
+function actionHintHtml(act){
+  const chat = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 11V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6l-3 2v-2.5A2 2 0 0 1 3 11z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
+  const phone = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 3l2 3-1.5 1 4 4 1-1.5L12 12s.5-1 0-1.5L10.5 9l-1.5 1-3-3 1-1.5L5.5 4 4 2.5 3 3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
+  if (act.kind==='wait')     return `<span class="sa-hint muted" data-testid="lead-suggested-action">${esc(act.label)}</span>`;
+  if (act.kind==='disabled') return `<span class="sa-hint muted" data-testid="lead-suggested-action">${esc(act.label)}</span>`;
+  if (act.kind==='call')     return `<span class="sa-hint call" data-testid="lead-suggested-action"><span class="sa-ico">${phone}</span>Call</span>`;
+  if (act.kind==='task')     return `<span class="sa-hint task" data-testid="lead-suggested-action"><span class="sa-ico">${TASK_ICON[act.task]||TASK_ICON.consult}</span>${esc(act.label)}</span>`;
+  if (MESSAGE_CHANNELS.includes(act.kind)) return `<span class="sa-hint" data-testid="lead-suggested-action"><span class="sa-ico">${chat}</span>${esc(CHANNEL_LABEL[act.kind])}</span>`;
+  return `<span class="sa-hint" data-testid="lead-suggested-action">${esc(act.label)}</span>`;
+}
+
+function engineHtml(l){
+  const a = l.automation || {};
+  const cls = a.state==='failed'?'failed':a.state==='blocked'?'blocked':a.state==='firing'?'firing':a.state==='done'?'done':'';
+  const label = a.state==='failed'?'Failed':a.state==='blocked'?'Blocked — held':a.state==='queued'?'Queued':a.state==='firing'?'Firing':'Delivered';
+  return `<span class="engine-state ${cls}" data-testid="engine-cell"><span class="es-dot"></span><span class="es-txt">${esc(a.lastEvent||'—')} · ${esc(label)}</span></span>`;
+}
+
+function renderPager(pages){
+  const c = $('pagination-controls');
+  const btn = (label, p, opts={}) => `<button class="pg-btn${opts.active?' active':''}" ${opts.disabled?'disabled':''} ${opts.testid?`data-testid="${opts.testid}"`:''} onclick="gotoPage(${p})">${label}</button>`;
+  let html = btn('‹ Prev', page-1, {disabled:page<=1});
+  const nums = [];
+  const add = p => nums.push(btn(String(p), p, {active:p===page}));
+  if (pages <= 7){ for(let p=1;p<=pages;p++) add(p); }
+  else {
+    add(1);
+    if (page > 3) nums.push('<span class="pg-ellipsis">…</span>');
+    for (let p=Math.max(2,page-1); p<=Math.min(pages-1,page+1); p++) add(p);
+    if (page < pages-2) nums.push('<span class="pg-ellipsis">…</span>');
+    add(pages);
+  }
+  html += nums.join('');
+  html += btn('Next ›', page+1, {disabled:page>=pages, testid:'pagination-next'});
+  html += `<select class="pg-size" data-testid="pagination-page-size" onchange="setPageSize(this.value)">
+    ${[25,50,100].map(s=>`<option value="${s}" ${s===pageSize?'selected':''}>${s} / page</option>`).join('')}</select>`;
+  c.innerHTML = html;
+}
+
+/* ── interactions ── */
+function gotoPage(p){ page = p; pendingNew = 0; updateNewPill(); renderList(); $('leads-body').scrollTop = 0; }
+function setPageSize(v){ pageSize = parseInt(v,10); page = 1; renderList(); }
+function onSearchInput(v){ filters.search = v.trim(); page = 1; render(); }
+function onFilterChange(key, v){ filters[key] = v; page = 1; document.getElementById('filter-'+key+'-pill').classList.toggle('active', v!=='all'); render(); }
+function clearFilters(){ filters = {search:'',urgency:'all',status:'all',source:'all',procedure:'all'}; $('filter-search').value=''; ['urgency','status','source','procedure'].forEach(k=>{$('filter-'+k).value='all'; document.getElementById('filter-'+k+'-pill').classList.remove('active');}); page=1; render(); }
+function filterToHot(){ filters.urgency='hot'; $('filter-urgency').value='hot'; document.getElementById('filter-urgency-pill').classList.add('active'); page=1; render(); }
+
+function setRole(r){
+  role = r;
+  localStorage.setItem('adoreal_lms_role', r);
+  /* Reset filters on role change so a filter set in one role never silently
+     persists (hidden state) into another — keeps the "one honest list" promise. */
+  filters = { search:'', urgency:'all', status:'all', source:'all', procedure:'all' };
+  const s = $('filter-search'); if (s) s.value = '';
+  ['urgency','status','source','procedure'].forEach(k => { const el=$('filter-'+k); if(el) el.value='all'; const pill=document.getElementById('filter-'+k+'-pill'); if(pill) pill.classList.remove('active'); });
+  page = 1;
+  render();
+}
+
+/* ── realtime ── */
+function toggleRealtime(){
+  realtimeOn = !realtimeOn;
+  const t = $('realtime-toggle');
+  t.classList.toggle('live', realtimeOn);
+  t.classList.toggle('paused', !realtimeOn);
+  $('realtime-label').textContent = realtimeOn ? 'Live' : 'Paused';
+  if (realtimeOn) scheduleArrival();
+}
+let arrivalTimer = null, arrivalsSoFar = 0;
+function scheduleArrival(){
+  clearTimeout(arrivalTimer);
+  if (!realtimeOn || NOW_OVERRIDE != null) return;
+  // first arrival ~5s; opening burst 12–20s for the first ~2min; then back off ~45s
+  let delay;
+  if (arrivalsSoFar === 0) delay = 5000;
+  else if (arrivalsSoFar < 8) delay = 12000 + Math.random()*8000;
+  else delay = 40000 + Math.random()*15000;
+  arrivalTimer = setTimeout(() => { spawnArrival(); arrivalsSoFar++; scheduleArrival(); }, delay);
+}
+function spawnArrival(){
+  const rnd = Math.random;
+  const pick = arr => arr[Math.floor(rnd()*arr.length)];
+  const dirty = rnd() < 0.2;  // match the ~20% seed defect rate — quality shouldn't appear to decay live
+  const first = pick(FIRST), last = pick(LAST);
+  const lead = makeLead(mulberry32(Math.floor(rnd()*1e9)), {
+    arrivedAt: Date.now(), status:'uncontacted', clean: !dirty,
+    name: dirty && rnd()<0.5 ? '@'+first.toLowerCase()+Math.floor(rnd()*99) : `${first} ${last}`,
+    nameQuality: dirty && rnd()<0.5 ? 'handle':'ok',
+    source: pick(['instagram','facebook','website','katie','phone','referral']),
+  });
+  LEADS.unshift(lead);
+  LEAD_INDEX.set(lead.id, lead);
+  const onTopP1 = (page === 1);
+  // toast
+  showToast(`New lead — ${lead.name} via ${(SOURCES[lead.source]||{}).label} · just now`, lead.id);
+  if (onTopP1 && passesFilters(lead)){
+    renderList();
+    const el = $('leads-body').querySelector(`.lead-row[data-lead-id="${lead.id}"]`);
+    if (el){ el.style.animation = 'none'; el.style.background = 'var(--p2)'; setTimeout(()=>{ el.style.transition='background 2.5s ease'; el.style.background=''; }, 30); }
+  } else {
+    pendingNew++; updateNewPill();
+  }
+  renderContext();
+}
+function updateNewPill(){ const p=$('new-leads-pill'); $('new-leads-count').textContent=pendingNew; p.classList.toggle('show', pendingNew>0); }
+function showNewLeads(){ page=1; pendingNew=0; updateNewPill(); render(); $('leads-body').scrollTop=0; }
+
+/* ── lightweight toast ── */
+let toastTimer2=null;
+function showToast(msg, leadId){
+  let t = $('lms-toast');
+  if (!t){ t=document.createElement('div'); t.id='lms-toast'; t.setAttribute('data-testid','lms-toast');
+    t.style.cssText='position:fixed;left:20px;bottom:20px;background:var(--white);border:1px solid var(--p4);border-radius:var(--r8);box-shadow:0 6px 24px rgba(52,47,44,.14);padding:12px 16px;font-size:13px;color:var(--text-primary);z-index:400;max-width:320px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s';
+    document.body.appendChild(t); }
+  t.innerHTML = esc(msg);
+  requestAnimationFrame(()=>{ t.style.opacity='1'; t.style.transform='translateY(0)'; });
+  clearTimeout(toastTimer2);
+  toastTimer2 = setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateY(8px)'; }, 6000);
+}
+
+/* ── live timer tick ── */
+let tickTimer = null;
+function startTick(){ clearInterval(tickTimer); if (NOW_OVERRIDE != null) return; tickTimer = setInterval(tick, 1000); }
+function tick(){
+  const now = clock();
+  // update only rendered rows' timers + tier (cheap: <= pageSize nodes).
+  // O(1) id lookup via LEAD_INDEX so the per-second tick stays flat as the
+  // dataset grows past 2,400 with realtime arrivals.
+  $('leads-body').querySelectorAll('.lead-row').forEach(r => {
+    const l = LEAD_INDEX.get(parseInt(r.dataset.leadId,10));
+    if (!l) return;
+    const tier = urgencyTier(l, now);
+    if (r.dataset.urgency !== tier) r.dataset.urgency = tier;
+    const chip = r.querySelector('.lead-timer');
+    if (chip){
+      const txt = fmtTimer(l, now).text;
+      if (chip.classList.contains('contacted')){
+        // keep the ✓ svg; only refresh the trailing text node ("replied 2h" etc.)
+        if (chip.lastChild && chip.lastChild.nodeType === 3) chip.lastChild.nodeValue = txt;
+      } else {
+        chip.textContent = txt;
+        // per-minute "pop": when the displayed minute ticks over on a lead still
+        // racing the clock (hot/cooling), flash the timer darker-red for ~1s so it
+        // catches the eye. Skipped on first sight of a row so a fresh page load
+        // doesn't burst-pop every timer at once.
+        const min = Math.floor((now - l.arrivedAt) / 60000);
+        const prev = chip.dataset.min;
+        if (prev !== undefined && prev !== String(min) && (tier === 'hot' || tier === 'cooling')){
+          chip.classList.remove('pop');
+          void chip.offsetWidth;          // restart the animation if mid-flight
+          chip.classList.add('pop');
+          setTimeout(() => { chip.classList.remove('pop'); }, 1000);
+        }
+        chip.dataset.min = String(min);
+      }
+    }
+  });
+  renderContext();
+}
+
+/* ── drawer ── */
+/* ── selection + detail pane (v0.15) ── */
+let selectedId = null;
+let composerChan = null;   // channel the composer is currently sending on
+let composerDraft = '';    // current (possibly edited) draft text
+let regenCount = 0;
+let threadShown = 0;       // how many of the thread's messages are rendered (grows on scroll-up)
+let threadLeadId = null;   // which lead the thread is currently showing
+const TIER_LABEL = { hot:'Needs you now', cooling:'Cooling', slow:'Waiting', stale:'Stale lead', contacted:'Contacted' };
+
+/* Reachable channels for the channel switcher in the composer. */
+function reachableChannels(l){
+  const out = [];
+  if (l.source==='instagram') out.push('ig');
+  if (l.source==='facebook')  out.push('fb');
+  if (l.phone && l.phoneValid && l.smsConsent){ out.push('wa'); out.push('sms'); }
+  if (l.email && l.emailStatus==='ok') out.push('em');
+  if (l.phone && l.phoneValid) out.push('call');
+  return [...new Set(out)];
+}
+
+/* reset the composer to the lead's suggested channel + a fresh draft */
+function initComposer(l){
+  const act = suggestedAction(l, role);
+  // tasks / wait / disabled have no composer — the detail pane shows a task card or note
+  if (act.kind === 'task' || act.kind === 'wait' || act.kind === 'disabled' || act.kind === 'dismiss'){
+    composerChan = null; composerDraft = ''; regenCount = 0; return;
+  }
+  let want = act.channel || (act.kind === 'call' ? 'call' : (MESSAGE_CHANNELS.includes(act.kind) ? act.kind : 'em'));
+  if (want !== 'call'){
+    // never open the composer on an unreachable channel (e.g. a WhatsApp
+    // preferred-channel for someone with no SMS consent) — clamp to a reachable one
+    const reach = reachableChannels(l).filter(c => c !== 'call');
+    if (!reach.includes(want)) want = (reach.includes(suggestedChannel(l)) ? suggestedChannel(l) : reach[0]) || 'call';
+  }
+  composerChan = want;
+  regenCount = 0;
+  composerDraft = composerChan === 'call' ? '' : genMessage(l, composerChan, regenCount);
+}
+function highlightSelected(){
+  document.querySelectorAll('.lead-row').forEach(r => r.classList.toggle('selected', parseInt(r.dataset.leadId,10) === selectedId));
+}
+
+function selectLead(id){
+  const l = LEADS.find(x => x.id === id);
+  if (!l) return;
+  selectedId = id;
+  highlightSelected();
+  initComposer(l);
+  renderDetail(l);
+  if (window.innerWidth < 1024){ $('detail-pane').classList.add('open'); $('detail-scrim').classList.add('open'); }
+}
+
+/* keep a selection in sync after list re-renders; auto-select the top lead
+   (hottest, longest-waiting) if none selected or it scrolled out of view */
+function syncSelection(){
+  const rows = sortedFiltered();
+  if (!rows.length){ selectedId = null; renderDetailEmpty(); return; }
+  if (selectedId == null || !rows.some(l => l.id === selectedId)) selectedId = rows[0].id;
+  const l = LEADS.find(x => x.id === selectedId);
+  highlightSelected();
+  if (l){ initComposer(l); renderDetail(l); }
+}
+
+function renderDetailEmpty(){
+  $('d-av').textContent = '—'; $('d-name').textContent = 'No lead selected'; $('d-sub').textContent = '';
+  $('detail-body').innerHTML = `<div class="detail-empty">Select a lead to see details and reply in one click.</div>`;
+}
+
+function closeDetail(){ $('detail-pane').classList.remove('open'); $('detail-scrim').classList.remove('open'); }
+
+/* subtle inbox hand-off (header link) — the in-pane scroll is the primary way to
+   read history now, so this is a convenience, not the way to "see more". */
+function openThreadLink(l, chan){
+  return `<a class="th-inbox" href="${inboxHref(l, chan)}" data-testid="detail-open-thread">Open in inbox ↗</a>`;
+}
+/* most recent inbound message — what the person last said (drives the reply
+   header + the "why this action" rationale) */
+function lastInboundText(l){
+  const all = fullThread(l);
+  for (let i = all.length - 1; i >= 0; i--){ if (all[i].dir === 'in') return all[i].text; }
+  return '';
+}
+/* one message → HTML. Patient/clinic are bubbles; logged calls + system touch-
+   points are quiet centred lines. */
+const THREAD_LOG_ICO = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.6" fill="currentColor"/></svg>';
+function threadMsgHtml(x){
+  if (x.dir === 'log') return `<div class="th-msg log"><span class="th-log"><span class="th-logico">${THREAD_LOG_ICO}</span>${esc(x.text)}</span></div>`;
+  return `<div class="th-msg ${x.dir}"><div class="th-bubble">${esc(x.text)}</div></div>`;
+}
+/* render the last `shown` messages (oldest→newest); a top control loads more */
+function threadBubbles(l, shown){
+  const all = fullThread(l);
+  const start = Math.max(0, all.length - shown);
+  const top = start === 0 ? `<div class="th-start">Start of conversation</div>`
+                          : `<button type="button" class="th-loadmore" onclick="loadEarlierThread()">Load earlier messages</button>`;
+  return top + all.slice(start).map(threadMsgHtml).join('');
+}
+/* load an older page of messages (button or scroll-up), keeping the view anchored */
+function loadEarlierThread(){
+  const l = LEADS.find(x => x.id === selectedId); if (!l) return;
+  const sc = document.getElementById('thread-scroll'); if (!sc) return;
+  const all = fullThread(l);
+  if (threadShown >= all.length) return;
+  const prevH = sc.scrollHeight;
+  threadShown = Math.min(all.length, threadShown + 5);   // load 5 more per scroll-up / click
+  sc.innerHTML = threadBubbles(l, threadShown);
+  sc.scrollTop = sc.scrollHeight - prevH;
+}
+/* the conversation thread — shows the most recent messages; older load by
+   scrolling up or via the button (no "open full conversation" required) */
+function threadHtml(l){
+  const all = fullThread(l);
+  if (!all.length) return '';
+  if (threadLeadId !== l.id || !threadShown){ threadLeadId = l.id; threadShown = Math.min(all.length, 5); }
+  // header channel = the channel the conversation is actually on (matches the
+  // composer pill), not the abstract preferredChannel
+  const chan = CHANNEL_LABEL[composerChan] || CHANNEL_LABEL[suggestedChannel(l)] || CHANNEL_LABEL[l.preferredChannel] || 'message';
+  return `<div class="thread" data-testid="thread">
+    <div class="thread-head">
+      <span class="th-title">Conversation</span>
+      <span class="th-meta">via ${esc(chan)} · ${all.length} messages</span>
+      ${openThreadLink(l, l.preferredChannel)}
+    </div>
+    <div class="thread-scroll" id="thread-scroll" data-testid="thread-scroll">${threadBubbles(l, threadShown)}</div>
+  </div>`;
+}
+/* after the detail pane renders, pin the thread to the newest message and lazy-
+   load older ones as the coordinator scrolls up */
+function wireThreadScroll(l){
+  const sc = document.getElementById('thread-scroll');
+  if (!sc) return;
+  sc.scrollTop = sc.scrollHeight;          // newest message in view
+  sc.addEventListener('scroll', () => {
+    if (sc.scrollTop <= 40) loadEarlierThread();
+  });
+}
+/* channel selector — pill + caret dropdown, copied from inbox.html's compose-chan */
+function chanDetail(l, c){
+  if (c === 'em') return (l.email && l.emailStatus === 'ok') ? l.email : 'no email';
+  if (c === 'wa' || c === 'sms') return l.phone ? maskPhone(l.phone) : 'no phone';
+  if (c === 'ig') return 'Instagram DM';
+  if (c === 'fb') return 'Messenger';
+  return '';
+}
+function chanSelectorHtml(l){
+  const chans = reachableChannels(l).filter(c => c !== 'call');
+  const cur = composerChan;
+  const items = chans.map(c =>
+    `<div class="chan-dd-item${c===cur?' active':''}" onclick="event.stopPropagation();setComposerChan('${c}')">
+       <span class="dd-dot cdot-${c}"></span><span class="dd-label">${esc(CHANNEL_LABEL[c])}</span><span class="dd-detail">${esc(chanDetail(l,c))}</span>
+     </div>`).join('');
+  return `<div class="chan-selector">
+    <button type="button" class="compose-chan" id="chan-pill" onclick="event.stopPropagation();toggleChanMenu()">
+      <span class="cdot cdot-${cur}"></span>
+      <span data-testid="composer-channel">${esc(CHANNEL_LABEL[cur])}</span>
+      <span class="chevron"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </button>
+    <div class="chan-dropdown" id="chan-menu" data-testid="chan-menu">
+      <div class="chan-dd-label">Send via</div>
+      ${items}
+    </div>
+  </div>`;
+}
+function toggleChanMenu(){
+  const dd = document.getElementById('chan-menu'), pill = document.getElementById('chan-pill');
+  if (!dd) return;
+  const open = !dd.classList.contains('open');
+  dd.classList.toggle('open', open); pill.classList.toggle('open', open);
+}
+function closeChanMenu(){ const dd=document.getElementById('chan-menu'), pill=document.getElementById('chan-pill'); if(dd)dd.classList.remove('open'); if(pill)pill.classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest('.chan-selector')) closeChanMenu(); });
+
+/* the 1-click message composer (first outreach OR reply). The "Sending via X"
+   label is gone — the channel is an inbox-style pill+caret in the foot. */
+function composerHtml(l, verb){
+  // note explains the CHANNEL choice — never contradicts the active channel
+  // (e.g. don't say "SMS held" while composing on Instagram)
+  let note = '';
+  if (l.defects.includes('no_consent') && composerChan !== 'sms' && composerChan !== 'wa')
+    note = `No SMS consent — reaching out on ${CHANNEL_LABEL[composerChan]} instead`;
+  else if (l.emailStatus === 'bounced' && composerChan !== 'em')
+    note = `Email bounced — using ${CHANNEL_LABEL[composerChan]} instead`;
+  const replyTo = l.status !== 'uncontacted'
+    ? `<div class="reply-to" data-testid="reply-to">Replying to <strong>${esc(firstName(l))}</strong>: “${esc(lastInboundText(l))}”</div>` : '';
+  return `<div class="composer" data-testid="composer">
+    ${replyTo}
+    <textarea id="composer-text" data-testid="composer-text" oninput="composerDraft=this.value">${esc(composerDraft)}</textarea>
+    <div class="composer-foot">
+      ${chanSelectorHtml(l)}
+      <button class="composer-send" data-testid="composer-send" onclick="sendGenerated()">${esc(verb||'Send')}</button>
+      <button class="composer-regen" onclick="regenMessage()">Regenerate</button>
+      ${note?`<span class="composer-note">${esc(note)}</span>`:''}
+    </div>
+  </div>`;
+}
+function callCardHtml(l){
+  // no valid phone → there's no reachable channel at all; don't offer a dead "Call now"
+  if (!l.phone || !l.phoneValid){
+    return `<div class="detail-empty" data-testid="no-channel" style="padding:22px 16px">No reachable channel for ${esc(firstName(l))} — no valid phone, email or DM on file. Add contact details to reach out.</div>`;
+  }
+  return `<div class="sec-title">Call this lead</div>
+    <div class="kv"><span class="kv-k">Number</span><span class="kv-v">${esc(l.phone||'—')}</span></div>
+    <div class="drawer-actions">
+      <a class="sa-btn" href="${actionHref(l,{kind:'call'})}" data-testid="composer-send">Call now</a>
+      ${l.email&&l.emailStatus==='ok'?`<button class="sa-btn ghost" onclick="setComposerChan('em')">Send a message instead</button>`:''}
+    </div>`;
+}
+/* why we're recommending this task — grounded in the person's most recent message */
+function taskReason(task, l){
+  const f = firstName(l);
+  if (task === 'consult')    return `${f} is asking how to get started — set up the consultation now.`;
+  if (task === 'forms')      return `Their consult is lined up — send the health declaration so the surgeon can review it first.`;
+  if (task === 'silhouette') return `${f} wants to picture the result before committing — a 3D simulation is the unblocker.`;
+  return '';
+}
+/* a recommended patient-journey task (book consult / health declaration / Silhouette) */
+function taskCardHtml(l, act){
+  const meta = TASK_META[act.task] || {};
+  const q = lastInboundText(l);
+  const why = `<div class="tc-why" data-testid="task-why">${q?`<span class="tc-why-msg">“${esc(q)}”</span>`:''}${esc(taskReason(act.task, l))}</div>`;
+  return `<div class="task-card" data-testid="task-card">
+    <span class="tc-ico">${TASK_ICON[act.task]||TASK_ICON.consult}</span>
+    <div class="tc-body">
+      <div class="tc-title">${esc(meta.label||act.label)}</div>
+      <div class="tc-desc">${esc(meta.desc||'')}</div>
+      <div class="tc-actions">
+        <button class="sa-btn" data-testid="task-do" onclick="completeTask('${act.task}')">${esc(meta.verb||act.label)}</button>
+        <a class="sa-btn ghost" href="${inboxHref(l, l.preferredChannel)}" data-testid="task-message">Message ${esc(firstName(l))}</a>
+      </div>
+      ${why}
+    </div>
+  </div>`;
+}
+/* prototype side-effect of acting on a task: confirm + advance the journey one
+   step, then re-render the same lead so the NEXT step surfaces. */
+function completeTask(task){
+  const l = LEADS.find(x => x.id === selectedId); if (!l) return;
+  const f = firstName(l);
+  const chan = CHANNEL_LABEL[l.preferredChannel] || 'message';
+  l.setup = l.setup || {};
+  if (task === 'consult'){ l.setup.consultBooked = true; showToast(`Consultation booked for ${f} · invite sent`); }
+  else if (task === 'forms'){ l.setup.declarationSent = true; showToast(`Health declaration sent to ${f} via ${chan}`); }
+  else if (task === 'silhouette'){ l.setup.silhouetteShared = true; showToast(`Silhouette simulation shared with ${f}`); }
+  l.lastTouchAt = clock();
+  renderList(); renderContext();
+  initComposer(l); renderDetail(l);   // stay on this lead; surface the next step
+}
+
+function renderDetail(l){
+  const src = SOURCES[l.source] || SOURCES.unknown;
+  const tier = urgencyTier(l);
+  const tm = fmtTimer(l);
+  $('d-av').textContent = initialsOf(l);
+  $('d-name').textContent = l.name || 'Unknown';
+  $('d-sub').textContent = `${TIER_LABEL[tier]} · ${tm.contacted ? tm.text : 'waiting ' + tm.text} · ${src.label}`;
+  const defs = defectsOf(l);
+  let body = '';
+
+  if (role === 'coordinator'){
+    const act = suggestedAction(l, role);
+    if (l.status === 'uncontacted'){
+      // speed-to-lead: they messaged us and we haven't replied — show THEIR
+      // unanswered thread (most recent at the bottom, scroll up for more), then
+      // the 1-click composer to reply.
+      body += threadHtml(l);
+      if (composerChan === 'call') body += callCardHtml(l);
+      else if (composerChan)       body += composerHtml(l, (l.threadLen || 0) > 3 ? 'Send reply' : 'Send');
+      else                         body += `<div class="detail-sent">${esc(act.label)}</div>`;
+    } else {
+      // engaged: show the recent conversation for context, THEN the next step
+      body += threadHtml(l);                          // carries the Open-full-conversation link
+      if (act.kind === 'task')          body += taskCardHtml(l, act);
+      else if (composerChan === 'call') body += callCardHtml(l);
+      else if (composerChan)            body += composerHtml(l, 'Send reply');
+    }
+  } else {
+    // onboarding / support primary action
+    const act = suggestedAction(l, role);
+    const aHref = actionHref(l, act);
+    body += `<div class="drawer-actions">`;
+    if (act.kind!=='wait' && act.kind!=='disabled' && act.kind!=='dismiss')
+      body += aHref ? `<a class="sa-btn" href="${aHref}" data-testid="detail-primary">${esc(act.label)}</a>` : `<span class="sa-disabled">${esc(act.label)}</span>`;
+    body += `<a class="sa-btn ghost" href="${inboxHref(l)}" data-testid="detail-open-thread">Open conversation →</a></div>`;
+  }
+
+  // shared: key facts
+  body += `<div class="sec-title">Lead details</div><div class="kv">
+    <span class="kv-k">${tm.contacted ? 'Last contact' : 'Waiting'}</span><span class="kv-v">${esc(tm.text)}</span>
+    <span class="kv-k">Stage</span><span class="kv-v">${stageChip(l)}</span>
+    <span class="kv-k">Source</span><span class="kv-v">${esc(src.label)}</span>
+    <span class="kv-k">Interest</span><span class="kv-v">${esc(interestsOf(l).join(', ')||'—')}</span>
+    <span class="kv-k">Est. value</span><span class="kv-v">${fmtMoney(l.value)}</span>
+    <span class="kv-k">Phone</span><span class="kv-v">${esc(l.phone||'—')}</span>
+    <span class="kv-k">Email</span><span class="kv-v">${esc(l.email||'—')}${l.emailStatus==='bounced'?' (bounced)':''}</span>
+    <span class="kv-k">SMS consent</span><span class="kv-v">${l.smsConsent?'On file':'Not captured'}</span>
+  </div>`;
+
+  // shared: data quality
+  body += `<div class="sec-title">Data quality</div><div class="dq-list" data-testid="dq-list">`;
+  body += defs.length ? defs.map(d => `<div class="dq-item"><span class="dq-dot"></span>${esc(d.label)}</div>`).join('')
+                      : `<div class="dq-item clean">No issues detected on this lead.</div>`;
+  body += `</div>`;
+
+  // support extras
+  if (role === 'support'){
+    const a = l.automation || {};
+    body += `<div class="sec-title">Delivery log</div><div class="dlog" data-testid="delivery-log">`;
+    body += `<div class="dlog-row ${a.state==='failed'?'fail':'ok'}"><span>${esc(a.lastEvent||'—')}</span><span class="dl-state">${esc(a.state||'—')}</span></div>`;
+    const CHAN = {em:'Email', wa:'WhatsApp', sms:'SMS', ig:'Instagram', fb:'Messenger'};
+    (a.delivery||[]).forEach(d => { body += `<div class="dlog-row ${d.status==='delivered'?'ok':d.status==='bounced'?'fail':''}"><span>${esc(CHAN[d.channel]||d.channel)}</span><span class="dl-state">${esc(d.status)}</span></div>`; });
+    body += `</div>`;
+    if ((a.templateFlags||[]).length){
+      const fl = {placeholder_unresolved:'Placeholder unresolved', link_blocked:'Non-whitelisted link blocked', no_consent_held:'No SMS consent — outbound held'};
+      body += `<div class="sec-title">Template safety</div><div style="margin-bottom:18px">${a.templateFlags.map(f=>`<span class="tflag">${esc(fl[f]||f)}</span>`).join('')}</div>`;
+    }
+  }
+
+  $('detail-body').innerHTML = body;
+  wireThreadScroll(l);   // pin thread to newest + enable scroll-up lazy load
+}
+
+function setComposerChan(ch){
+  const l = LEADS.find(x => x.id === selectedId); if (!l) return;
+  composerChan = ch;
+  regenCount = 0;
+  composerDraft = ch === 'call' ? '' : genMessage(l, ch, regenCount);
+  renderDetail(l);
+}
+function regenMessage(){
+  const l = LEADS.find(x => x.id === selectedId); if (!l) return;
+  regenCount++;
+  composerDraft = genMessage(l, composerChan, regenCount);
+  const ta = $('composer-text'); if (ta) ta.value = composerDraft;
+}
+function sendGenerated(){
+  const l = LEADS.find(x => x.id === selectedId); if (!l) return;
+  const label = CHANNEL_LABEL[composerChan] || 'message';
+  const first = firstName(l);
+  const wasUncontacted = l.status === 'uncontacted';
+  // simulate the send: the lead is now in conversation and drops out of "hot"
+  l.status = 'in_progress'; if (!l.firstOutboundAt) l.firstOutboundAt = clock(); l.lastTouchAt = clock();
+  showToast(`${wasUncontacted ? 'Sent' : 'Reply sent'} via ${label} to ${first} · in conversation`);
+  renderList(); renderContext();
+  if (window.innerWidth < 1024){ closeDetail(); selectedId = null; return; }
+  // desktop: advance to the next lead that still needs a human — the speed loop
+  const rows = sortedFiltered();
+  const next = rows.find(x => x.status === 'uncontacted') || rows[0];
+  if (next) selectLead(next.id); else { selectedId = null; renderDetailEmpty(); }
+}
+
+/* ── pending dropdown / version / nav stubs (chrome) ── */
+function togglePendingMenu(e){ e&&e.stopPropagation(); const m=$('pending-menu'),b=$('pending-btn'); const o=m.classList.toggle('open'); b.setAttribute('aria-expanded',o?'true':'false'); }
+function closePendingMenu(){ $('pending-menu').classList.remove('open'); $('pending-btn').setAttribute('aria-expanded','false'); }
+document.addEventListener('click', e => { const m=$('pending-menu'); if(m&&m.classList.contains('open')&&!e.target.closest('.pending-anchor')) closePendingMenu(); });
+let toastTimer=null;
+function showVersion(){ $('version-toast-num').textContent='v'+VERSION; $('version-toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('version-toast').classList.remove('visible'),2400); }
+function stubNav(name){ alert(`${name} — lives in the broader Adoreal product. Stubbed in the LMS prototype.`); }
+
+/* ── boot ── */
+LEADS = buildSeed();
+LEAD_INDEX = new Map(LEADS.map(l => [l.id, l]));
+document.addEventListener('DOMContentLoaded', () => {
+  $('version-toast-num').textContent = 'v'+VERSION;
+  // populate the Procedure filter from the canonical procedure list
+  const pf = $('filter-procedure');
+  if (pf) PROCEDURES.slice().sort().forEach(p => { const o=document.createElement('option'); o.value=p; o.textContent=p; pf.appendChild(o); });
+  render();
+  startTick();
+  scheduleArrival();
+  document.addEventListener('keydown', e => { if (e.key==='Escape'){ closeDetail(); closePendingMenu(); } });
+});
+
+/* ── test surface ── */
+window.__lms = {
+  VERSION,
+  SOURCES, PROCEDURES, STAGES, DEFECTS,
+  urgencyTier, suggestedAction, suggestedChannel, nextPatientTask, buildThread, genMessage, defectsOf, fmtTimer,
+  get role(){ return role; }, setRole,
+  get leads(){ return LEADS; },
+  get selectedId(){ return selectedId; }, selectLead, sendGenerated, setComposerChan,
+  get page(){ return page; }, get pageSize(){ return pageSize; },
+  gotoPage, setPageSize, sortedFiltered,
+  /* freeze the clock + stop intervals + arrivals for deterministic tests */
+  freezeForTest(fixedNow){
+    NOW_OVERRIDE = fixedNow != null ? fixedNow : BOOT;
+    realtimeOn = false; clearTimeout(arrivalTimer); clearInterval(tickTimer);
+    const t=$('realtime-toggle'); if(t){ t.classList.remove('live'); t.classList.add('paused'); $('realtime-label').textContent='Paused'; }
+    render();
+  },
+  spawnArrival,   // tests can trigger a deterministic-ish arrival
+  tick,                          // run one realtime tick against the current rows
+  get now(){ return clock(); },  // current (frozen) clock value
+  setNow(t){ NOW_OVERRIDE = t; },// advance the (frozen) clock WITHOUT re-rendering rows — for pop tests
+};
+</script>
+</body>
+</html>
