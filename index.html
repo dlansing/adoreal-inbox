@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  adoreal. — prototype ecosystem entry point
+  ═══════════════════════════════════════════════════════════════════════════
+
+  WHAT HAPPENED TO THIS FILE
+  Until 2026-08-22 index.html was a near-duplicate of inbox.html, forked before
+  the v0.26 "Contact Center -> Patients" rename. It had drifted badly: its nav
+  still said "Contact Center", it was stamped v0.42, and it carried none of the
+  v0.43-v0.45 work (the Needs you now band, embed mode, the ?patient= id-vs-
+  index bugfix, the Messaging nav). Anyone who opened the folder landed on the
+  default index and saw a stale product. That is worse than no file at all.
+
+  It is now a redirect to lms.html, for two reasons:
+    1. index.html is what a static file server serves by default, so the
+       ecosystem needs it to exist and to land somewhere sensible.
+    2. Patients is the entry point under the current IA. There are two
+       destinations, Patients and Messaging, and the patient inbox is reached
+       by expanding it from a person's row on the queue.
+
+  The real inbox lives in inbox.html and is not orphaned: lms.html expands it,
+  and the overlay's "Open in new tab" links straight to it.
+
+  A copy of the old stale file was kept outside the folder when this was
+  replaced, and the whole v0.1-v0.42 inbox lineage still exists as
+  ~/Downloads/adoreal_unified_inbox_v0_*.html.
+-->
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="adoreal-prototype-version" content="0.45"/>
+<title>adoreal. — opening Patients</title>
+<meta http-equiv="refresh" content="0; url=lms.html"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Mulish:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  html,body{margin:0;height:100%}
+  body{background:#FEF7F5;color:#342F2C;font-family:'Mulish','Proxima Nova','Helvetica Neue',Arial,sans-serif;
+       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+  .wm{font-family:'DM Serif Display',Georgia,serif;font-size:32px;letter-spacing:-.3px}
+  .note{font-size:14px;color:#6D635D;line-height:1.6;max-width:430px}
+  .links{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+  .links a{display:inline-flex;align-items:center;height:34px;padding:0 16px;border-radius:20px;
+           border:1px solid #E7CDC6;background:#fff;color:#965E47;text-decoration:none;font-size:13px;font-weight:500}
+  .links a:hover{background:#F4E7E3}
+</style>
+</head>
+<body>
+  <div class="wm">adoreal.</div>
+  <div class="note">Opening the patient queue. If nothing happens, pick a surface.</div>
+  <div class="links">
+    <a href="lms.html" data-testid="entry-patients">Patients</a>
+    <a href="messaging.html" data-testid="entry-messaging">Messaging</a>
+    <a href="adoreal_templates.html#/settings" data-testid="entry-settings">Settings</a>
+  </div>
+</body>
+</html>

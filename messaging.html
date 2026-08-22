@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  adoreal. — Messaging (secure clinician to clinician)  ·  v0.3
+  ═══════════════════════════════════════════════════════════════════════════
+
+  v0.3 (2026-08-22) — design-system conformance pass, found by audit.
+    • Tag radius 4px -> 20px. The design-system reference says pills, chips and
+      tags are 20px in three separate places, and the shipped Angular
+      components agree (11 of 12 radii in lead-queue.component.scss are
+      $sz-20). The 4px "squarish tag" came from a stale note.
+    • Font stack had Mulish FIRST, so this surface rendered in a different
+      typeface from its siblings. Proxima Nova now leads, as it does in
+      lms.html and inbox.html and as the reference requires. Dropped the
+      weight-300 request that no sibling loads.
+    • Three greys (--g2, --g4, --g5) did not match the siblings despite the
+      comment claiming they did. Corrected to the shared values.
+
+  WHAT THIS IS
+  The fourth surface in the ~/Downloads/adoreal_prototype/ ecosystem, alongside
+  lms.html (Patients), inbox.html (the patient conversation, expanded from the
+  queue) and adoreal_templates.html (Settings).
+
+  It is a STANDALONE STAFF CHAT. Clinician to clinician, secure. Direct
+  messages and channels. There is no patient list and no patient audience:
+  nothing typed here can reach a patient, by construction.
+
+  v0.2 (2026-08-22) — scope corrected after David's review.
+    v0.1 followed Klara's literal pattern, where internal notes hang off a
+    patient conversation, so it carried patient-linked threads, an Unassigned
+    triage lane, and a Patient/Internal composer toggle. David's call: "I want
+    the standalone staff chat, similar to Klara's look but clearly adoreal
+    software. It's just for convos in the conversation, secure messaging
+    clinician to clinician."
+    So the following are GONE, deliberately:
+      • patient-linked conversations and the patient context panel
+      • the Patient | Internal composer tabs (there is only one audience now,
+        which makes a mode switch a hazard rather than a feature)
+      • Unassigned / Closed / assignment (queue mechanics, they belong to the
+        Patients surface, not to a chat)
+      • the per-row ageing timer (it measures a patient waiting; a colleague
+        reading a message later is not an SLA breach)
+    What stayed, because it is what makes clinical chat work:
+      • Direct messages and channels
+      • @mentions that target lists as well as people, so @front-desk reaches
+        whoever is on shift
+      • a Mentions lane, so being pulled in is a queue you can clear
+      • unread state per conversation
+
+  WHY IT LOOKS DIFFERENT, AND WHERE IT STAYS ADOREAL
+  The rail is violet so that across two monitors you can tell instantly which
+  window is safe to be candid in. Colour is a faster guard than reading a
+  label. Everything else is deliberately Adoreal: the same top bar, DM Serif
+  wordmark, Proxima Nova body, 20px pills and tags, sentence case, and the same
+  user-chip build stamp. Klara's silhouette, Adoreal's components.
+
+  PALETTE PROVENANCE, HONESTLY
+  Adoreal has no formally named "secondary" palette. "Secondary" exists only
+  as a token role inside the nude family (Secondary Brown #B1785F, Buttons/
+  Secondary #E1A991), so using those literally would make this surface feel
+  MORE like the primary style guide, not less.
+  These are anchored on pairs that already ship in production
+  (lead-queue.component.scss stage chips), so they are AA verified:
+    --m-ink  #3A2B7A   REAL: Decide stage ink
+    --m-100  #C4B6FF   REAL: Decide stage background / Figma "Expanded Violet"
+  The three mid-steps (--m-700/-500/-300) are interpolated by me and are the
+  one part of this that is NOT from Figma. They need Sofia's sign-off. Flagged
+  rather than buried, because Figma is the source of truth.
+  Violet is the only sanctioned non-nude hue that clears every stated ban in
+  the design system: not green, not teal, not a cold corporate blue.
+
+  KNOWN GAPS (v0.3)
+    • Channels and people are seeded; you cannot create either yet.
+    • No threading inside a message. Flat conversation only.
+    • Unread counts reset on reload (no persistence).
+    • Mentions lane is derived, not stored: dismissing is in-memory.
+-->
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="adoreal-prototype-version" content="0.3"/>
+<title>adoreal. · Messaging · v0.3</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  /* Shared brand tokens, identical to the sibling prototypes so the top bar
+     reads as the same application. */
+  --bg:#FEF7F5;--white:#FFFFFF;--black:#342F2C;
+  --nude:#965E47;--brown:#B1785F;
+  --p1:#FDF2EF;--p2:#F4E7E3;--p3:#EFDCD7;--p4:#E7CDC6;--p5:#DFBBB1;
+  /* v0.3: three greys corrected to the sibling values. The comment above
+     claimed these were identical across the ecosystem and they were not:
+     --g2 was #F5F4F4, --g4 #DCDCDC, --g5 #B8B8B8. The siblings (and
+     production's main-palette.scss) use the values below. */
+  --g2:#F9F9F9;--g3:#EBEAEA;--g4:#D3D3D3;--g5:#BDBDBD;--g6:#787878;--g7:#6D635D;
+  --red:#CB4137;--green:#7AC558;--yellow:#F4C569;
+  --r20:20px;--r12:12px;--r8:8px;
+
+  /* In-office identity. Provenance in the header comment. */
+  --m-ink:#3A2B7A;   /* REAL, shipping */
+  --m-700:#5B4AA0;   /* interpolated, needs Figma sign-off */
+  --m-500:#7F70BC;   /* interpolated, needs Figma sign-off */
+  --m-300:#A79CE0;   /* interpolated, needs Figma sign-off */
+  --m-100:#C4B6FF;   /* REAL, shipping */
+  --m-050:#F4F1FF;   /* tint of --m-100 */
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+/* v0.3: font stack corrected to match the siblings exactly. This file had
+   Mulish FIRST, which meant its top bar rendered in a different typeface from
+   lms.html and inbox.html even though the rest of the declarations matched.
+   Proxima Nova is the brand font per the design-system reference ("Proxima
+   Nova is the only font"); Mulish is the open-source stand-in for machines
+   without the licensed family, so it belongs second, not first. */
+body{font-family:'Proxima Nova','Mulish','Nunito Sans','Helvetica Neue',Arial,sans-serif;background:var(--white);color:var(--black);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ══ SHARED TOP BAR (ecosystem chrome, unchanged from the siblings) ══ */
+.aos-topbar{display:flex;align-items:center;gap:32px;padding:0 28px;height:64px;background:var(--white);border-bottom:1px solid var(--p4);flex-shrink:0;position:relative;z-index:50}
+.aos-wordmark{font-family:'DM Serif Display',Georgia,serif;font-size:24px;color:var(--black);letter-spacing:-.3px;flex-shrink:0}
+.aos-search{position:relative;flex-shrink:0}
+.aos-search input{width:260px;height:38px;border:1.5px solid var(--p4);border-radius:var(--r20);background:var(--white);padding:0 14px 0 38px;font-size:13px;color:var(--black);font-family:inherit;outline:none}
+.aos-search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--g6);display:inline-flex;pointer-events:none}
+.aos-nav{display:flex;align-items:center;gap:28px;height:100%}
+.aos-nav-item{font-size:14px;color:var(--g7);font-weight:300;cursor:default;padding:6px 0;letter-spacing:.1px;display:inline-flex;align-items:center;gap:6px;line-height:1;text-decoration:none;transition:color .15s}
+.aos-nav-item[href]{cursor:pointer}
+.aos-nav-item:hover{color:var(--black)}
+.aos-nav-item.active{color:var(--m-ink);font-weight:600}
+.aos-nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--m-ink);color:var(--white);font-size:10px;font-weight:600;line-height:1;font-family:inherit;flex-shrink:0}
+.aos-nav-badge.zero{display:none}
+.aos-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.aos-icon-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--p4);background:var(--white);cursor:pointer;color:var(--g7);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.aos-icon-btn:hover{background:var(--p2);color:var(--nude)}
+.aos-user{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px 4px 4px;border-radius:var(--r20);transition:background .15s}
+.aos-user:hover{background:var(--p2)}
+.aos-user-av{width:28px;height:28px;border-radius:50%;background:var(--nude);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.aos-user-name{font-size:14px;color:var(--black);font-weight:400}
+.aos-user-caret{color:var(--g6);display:inline-flex}
+.version-toast-anchor{position:relative;display:flex;align-items:center}
+.version-toast{position:absolute;top:calc(100% + 8px);right:0;background:var(--white);border:1px solid var(--p4);border-radius:var(--r12);padding:8px 14px;box-shadow:0 6px 20px rgba(52,47,44,.12);display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap;opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .15s,transform .15s;z-index:1000}
+.version-toast.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+.version-toast-label{color:var(--g7);font-weight:500}
+.version-toast-num{color:var(--m-ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ══ SHELL ══ */
+.ms-shell{flex:1;min-height:0;display:flex}
+
+/* ── Rail. The violet ground: the "you are somewhere else" cue, read before
+   any content. Sections, then the conversations inside each. ── */
+.ms-rail{width:236px;flex-shrink:0;background:var(--m-ink);color:var(--white);display:flex;flex-direction:column;overflow-y:auto}
+.ms-rail-brand{padding:15px 16px 12px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:.1px}
+.ms-rail-lock{width:14px;height:14px;display:inline-flex;color:var(--m-100)}
+.ms-rail-note{padding:0 16px 14px;font-size:11.5px;color:var(--m-300);line-height:1.5}
+.ms-sec{padding:10px 16px 5px;font-size:11px;font-weight:700;letter-spacing:.3px;color:var(--m-300);display:flex;align-items:center;gap:6px}
+/* The ICONS strings are bare <svg viewBox> with no width/height, so any
+   container that drops them in raw must size them. Without this they inherit
+   the flex line and render at full container width. */
+.ms-sec svg{width:12px;height:12px;flex-shrink:0}
+.ms-rail-lock svg,.ms-item-ico svg{width:100%;height:100%;display:block}
+.ms-sys svg{width:11px;height:11px;flex-shrink:0}
+.ms-send-note svg{width:12px;height:12px;flex-shrink:0}
+.ms-sec-count{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+.ms-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 16px;background:transparent;border:0;border-left:2px solid transparent;color:rgba(255,255,255,.84);font-family:inherit;font-size:13.5px;text-align:left;cursor:pointer;transition:background .12s,color .12s}
+.ms-item:hover{background:rgba(255,255,255,.07);color:var(--white)}
+.ms-item.active{background:rgba(255,255,255,.13);border-left-color:var(--m-100);color:var(--white);font-weight:600}
+.ms-item-ico{width:14px;height:14px;flex-shrink:0;display:inline-flex;opacity:.85}
+.ms-item-av{width:22px;height:22px;border-radius:50%;background:var(--m-500);color:var(--white);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.ms-item-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms-unread{min-width:18px;height:18px;border-radius:9px;background:var(--m-100);color:var(--m-ink);font-size:10.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;font-variant-numeric:tabular-nums;flex-shrink:0}
+.ms-unread.zero{display:none}
+.ms-rail-sep{height:1px;background:rgba(255,255,255,.12);margin:10px 16px}
+
+/* ── Thread ── */
+.ms-thread{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--white)}
+.ms-thread-head{padding:11px 18px;border-bottom:1px solid var(--g3);display:flex;align-items:center;gap:11px;flex-shrink:0}
+.ms-th-av{width:32px;height:32px;border-radius:50%;background:var(--m-100);color:var(--m-ink);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.ms-th-title{font-size:15px;font-weight:600;color:var(--black)}
+.ms-th-sub{font-size:12px;color:var(--g6)}
+.ms-th-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+/* Tags: 4px radius, sentence case (house style). */
+/* v0.3: radius 4px -> --r20. The design-system reference is explicit that
+   pills, chips and tags are 20px, and the shipped Angular components agree
+   (11 of 12 radii in lead-queue.component.scss are $sz-20). */
+.ms-tag{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:var(--r20);font-size:11px;font-weight:600;line-height:1;white-space:nowrap;background:var(--m-050);color:var(--m-ink)}
+.ms-btn{font-size:12px;font-weight:500;padding:6px 12px;border-radius:var(--r20);border:1px solid var(--m-300);background:transparent;color:var(--m-ink);cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.ms-btn:hover{background:var(--m-050)}
+.ms-btn-primary{border-color:var(--m-ink);background:var(--m-ink);color:var(--white)}
+.ms-btn-primary:hover{background:var(--m-700)}
+.ms-btn-primary:disabled{background:var(--g4);border-color:var(--g4);color:var(--white);cursor:not-allowed}
+
+.ms-msgs{flex:1;min-height:0;overflow-y:auto;padding:18px 18px 8px;background:var(--m-050)}
+.ms-day{display:flex;align-items:center;gap:12px;margin:6px 0 16px;font-size:11px;color:var(--g6)}
+.ms-day::before,.ms-day::after{content:'';flex:1;height:1px;background:var(--g3)}
+
+.ms-msg{display:flex;gap:9px;margin-bottom:14px;max-width:660px}
+.ms-msg.me{margin-left:auto;flex-direction:row-reverse}
+.ms-msg-av{width:26px;height:26px;border-radius:50%;background:var(--m-100);color:var(--m-ink);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;align-self:flex-end}
+.ms-bubble{padding:9px 13px;border-radius:14px;font-size:13.5px;line-height:1.55;background:var(--white);border:1px solid var(--g3);color:var(--black);border-bottom-left-radius:4px}
+.ms-msg.me .ms-bubble{background:var(--m-100);border-color:var(--m-100);color:var(--m-ink);border-bottom-left-radius:14px;border-bottom-right-radius:4px}
+.ms-msg-foot{font-size:11px;color:var(--g6);margin-top:4px}
+.ms-msg.me .ms-msg-foot{text-align:right}
+.ms-mention{background:var(--m-ink);color:var(--white);border-radius:4px;padding:0 4px;font-weight:600}
+.ms-msg.me .ms-mention{background:var(--m-ink);color:var(--white)}
+.ms-sys{text-align:center;margin:0 0 14px}
+.ms-sys span{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:var(--r20);background:var(--white);border:1px solid var(--g3);color:var(--g6);font-size:11.5px}
+.ms-empty{padding:40px 20px;text-align:center;font-size:13px;color:var(--g6);line-height:1.6}
+
+/* ── Composer. One audience, so no mode switch to get wrong. ── */
+.ms-composer{border-top:1px solid var(--g3);background:var(--white);flex-shrink:0;padding:12px 18px 14px;position:relative}
+.ms-input{width:100%;min-height:62px;resize:vertical;border:1px solid var(--g4);border-radius:var(--r8);padding:10px 12px;font-family:inherit;font-size:13.5px;color:var(--black);background:var(--white);outline:none;line-height:1.5}
+.ms-input:focus{border-color:var(--m-500)}
+.ms-send-row{display:flex;align-items:center;gap:10px;margin-top:9px}
+.ms-send-note{font-size:11.5px;color:var(--g6);display:inline-flex;align-items:center;gap:6px}
+.ms-send-note svg{width:12px;height:12px;color:var(--m-500)}
+.ms-send-spacer{margin-left:auto}
+.ms-kbd{font-size:11px;color:var(--g5)}
+.ms-mention-pop{position:absolute;bottom:calc(100% - 46px);left:18px;width:290px;background:var(--white);border:1px solid var(--m-300);border-radius:var(--r8);box-shadow:0 8px 26px rgba(58,43,122,.18);z-index:60;display:none;overflow:hidden}
+.ms-mention-pop.open{display:block}
+.ms-mention-head{font-size:11px;font-weight:600;color:var(--g6);padding:8px 12px 6px}
+.ms-mention-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 12px;background:transparent;border:0;font-family:inherit;font-size:13px;color:var(--black);text-align:left;cursor:pointer}
+.ms-mention-item:hover{background:var(--m-050)}
+.ms-mention-av{width:22px;height:22px;border-radius:50%;background:var(--m-100);color:var(--m-ink);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.ms-mention-kind{margin-left:auto;font-size:10.5px;color:var(--g6)}
+
+/* ── Right panel: who you are talking to ── */
+.ms-ctx{width:252px;flex-shrink:0;border-left:1px solid var(--g3);background:var(--white);overflow-y:auto;padding:16px}
+.ms-ctx-label{font-size:12px;font-weight:600;color:var(--g7);margin-bottom:10px}
+.ms-ctx-row{display:flex;flex-direction:column;gap:2px;margin-bottom:12px;font-size:13px}
+.ms-ctx-k{font-size:11px;color:var(--g6)}
+.ms-ctx-v{color:var(--black)}
+.ms-member{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:13px;color:var(--black)}
+.ms-member-av{width:24px;height:24px;border-radius:50%;background:var(--m-100);color:var(--m-ink);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.ms-member-role{margin-left:auto;font-size:11px;color:var(--g6)}
+.ms-ctx-sec{margin-bottom:20px}
+
+.ms-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:var(--m-ink);color:var(--white);font-size:13px;padding:10px 18px;border-radius:var(--r20);box-shadow:0 10px 30px rgba(58,43,122,.28);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:900}
+.ms-toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width: 1180px){ .ms-ctx{display:none} }
+@media (max-width: 900px){ .ms-rail{width:70px}.ms-rail-brand span,.ms-rail-note,.ms-sec span,.ms-item-name,.ms-sec-count{display:none} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+
+<div class="aos-topbar" data-testid="topbar">
+  <div class="aos-wordmark" data-testid="wordmark">adoreal.</div>
+  <div class="aos-search" data-testid="topbar-search">
+    <span class="aos-search-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+    <input type="text" placeholder="Search messages" disabled/>
+  </div>
+  <!-- Two destinations, per David: Patients and Messaging. The patient inbox
+       is not a nav destination; it belongs to a person and is expanded from
+       that person's row on the Patients queue. -->
+  <nav class="aos-nav">
+    <span class="aos-nav-item" data-testid="topnav-dashboard">Dashboard</span>
+    <span class="aos-nav-item" data-testid="topnav-schedule">Schedule</span>
+    <a class="aos-nav-item" href="lms.html" data-testid="topnav-patients">Patients</a>
+    <span class="aos-nav-item" data-testid="topnav-financials">Financials</span>
+    <!-- This surface owns the Messaging slot, so this is the only place a
+         Messaging unread badge may render. -->
+    <span class="aos-nav-item active" data-testid="topnav-messaging">
+      Messaging<span class="aos-nav-badge" id="nav-unread" data-testid="nav-unread">0</span>
+    </span>
+  </nav>
+  <div class="aos-right">
+    <button class="aos-icon-btn" title="Settings" aria-label="Settings" onclick="openTemplateSettings()" data-testid="gear-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+    <div class="version-toast-anchor">
+      <div class="aos-user" id="aos-user-btn" data-testid="user-chip" role="button" tabindex="0" onclick="showVersion()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showVersion()}">
+        <div class="aos-user-av">AS</div>
+        <span class="aos-user-name">Alex Smith</span>
+        <span class="aos-user-caret"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </div>
+      <div class="version-toast" id="version-toast" role="status" aria-live="polite">
+        <span class="version-toast-label">Prototype</span>
+        <span class="version-toast-num" id="version-toast-num" data-testid="version-num">v—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ms-shell">
+  <!-- ══ RAIL ══ -->
+  <div class="ms-rail" data-testid="rail">
+    <div class="ms-rail-brand">
+      <span class="ms-rail-lock"><svg viewBox="0 0 16 16" fill="none"><rect x="3.2" y="7" width="9.6" height="7" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+      <span>Staff messaging</span>
+    </div>
+    <div class="ms-rail-note">Clinician to clinician. No patient can see anything here.</div>
+    <div id="rail-body"></div>
+  </div>
+
+  <!-- ══ THREAD ══ -->
+  <div class="ms-thread">
+    <div class="ms-thread-head">
+      <div class="ms-th-av" id="th-av">—</div>
+      <div>
+        <div class="ms-th-title" id="th-title">No conversation selected</div>
+        <div class="ms-th-sub" id="th-sub"></div>
+      </div>
+      <div class="ms-th-right" id="th-right"></div>
+    </div>
+    <div class="ms-msgs" id="msgs" data-testid="thread"></div>
+    <div class="ms-composer" data-testid="composer">
+      <div class="ms-mention-pop" id="mention-pop" data-testid="mention-pop">
+        <div class="ms-mention-head">Mention a person or a list</div>
+        <div id="mention-items"></div>
+      </div>
+      <textarea class="ms-input" id="input" data-testid="composer-input"
+        placeholder="Message your team" oninput="onInput()" onkeydown="onKey(event)"></textarea>
+      <div class="ms-send-row">
+        <span class="ms-send-note" data-testid="send-note">
+          <svg viewBox="0 0 16 16" fill="none"><rect x="3.2" y="7" width="9.6" height="7" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Internal only. Never reaches a patient.
+        </span>
+        <span class="ms-send-spacer"></span>
+        <span class="ms-kbd">Cmd + Enter</span>
+        <button class="ms-btn ms-btn-primary" onclick="send()" data-testid="send-btn" id="send-btn" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CONTEXT ══ -->
+  <div class="ms-ctx" id="ctx" data-testid="context-panel"></div>
+</div>
+
+<div class="ms-toast" id="toast" role="status" aria-live="polite" data-testid="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   Secure staff messaging, v0.2
+
+   Model: a conversation is a 'dm' (one colleague) or a 'channel' (many).
+   There is no patient conversation type, so there is no patient audience and
+   no mode switch. Messages are 'msg' (from a person) or 'system'.
+   ════════════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const ME = { handle:'alex', name:'Alex Smith', initials:'AS' };
+
+/* Mention targets: people AND lists, so @front-desk reaches whoever is on
+   shift rather than a named person who is not. */
+/* `short` is explicit rather than role.split(' ')[0]. Splitting turned
+   "Patient coordinator" into "Patient", which in a clinical product reads as
+   if the colleague were the patient. */
+const PEOPLE = [
+  { handle:'sarah',   name:'Sarah K.',    initials:'SK', role:'Patient coordinator', short:'Coordinator' },
+  { handle:'dave',    name:'Dave L.',     initials:'DL', role:'Patient coordinator', short:'Coordinator' },
+  { handle:'nunnari', name:'Dr. Nunnari', initials:'DN', role:'Surgeon',             short:'Surgeon' },
+  { handle:'ellinor', name:'Ellinor L.',  initials:'EL', role:'Front desk',          short:'Front desk' },
+  { handle:'priya',   name:'Priya S.',    initials:'PS', role:'Theatre nurse',       short:'Nurse' },
+];
+const LISTS = [
+  { handle:'front-desk', name:'Front desk', initials:'FD', role:'List · 3 people' },
+  { handle:'nurses',     name:'Nurses',     initials:'NU', role:'List · 4 people' },
+  { handle:'surgeons',   name:'Surgeons',   initials:'SU', role:'List · 2 people' },
+];
+const mentionTargets = () => [...PEOPLE, ...LISTS];
+
+/* Seeded conversations. Clinical talk between colleagues, nothing addressed
+   to a patient. Patient names appear as subjects of discussion, which is the
+   normal reality of clinical chat, but no message here is deliverable. */
+let CONVS = [
+  {
+    id:1, kind:'channel', name:'Theatre list', members:['sarah','nunnari','priya','ellinor','dave'],
+    topic:"Today's running order and delays", unread:2,
+    msgs:[
+      { who:'system', text:'Sarah K. created this channel', ago:'Mon' },
+      { who:'sarah',   text:"Dr. Nunnari is running about 20 minutes behind this morning. @front-desk can you warn the 10:00 and the 10:30?", ago:'08:12' },
+      { who:'ellinor', text:"Both called. Both happy to wait.", ago:'08:19' },
+      { who:'priya',   text:"Second theatre is turned over and ready whenever you are.", ago:'08:41' },
+    ],
+  },
+  {
+    id:2, kind:'dm', with:'nunnari', unread:1,
+    msgs:[
+      { who:'alex',    text:"Charlotte Webb, three weeks post facelift, reports increasing tightness on the right side. Worth a look before I reply to her?", ago:'09:02' },
+      { who:'nunnari', text:"Normal at three weeks, but I would rather see her than guess. Can you offer her tomorrow morning?", ago:'09:14' },
+      { who:'nunnari', text:"Tell her it is routine. I do not want her worrying overnight.", ago:'09:14' },
+    ],
+  },
+  {
+    id:3, kind:'dm', with:'sarah', unread:0,
+    msgs:[
+      { who:'sarah', text:"Yuki Tanaka wants to cancel. She was keen last week so something has changed. I am going to call rather than message.", ago:'08:55' },
+      { who:'alex',  text:"Good call. Let me know what she says and I will hold the slot until end of day.", ago:'08:58' },
+      { who:'sarah', text:"Will do.", ago:'08:58' },
+    ],
+  },
+  {
+    id:4, kind:'channel', name:'Front desk', members:['ellinor','dave','sarah'],
+    topic:'Reception, payments, day to day', unread:0,
+    msgs:[
+      { who:'dave',    text:"Card machine is back up. No need for the mobile reader.", ago:'Yesterday' },
+      { who:'ellinor', text:"Thank you. That thing has caused nothing but grief.", ago:'Yesterday' },
+    ],
+  },
+  {
+    id:5, kind:'channel', name:'Complications', members:['nunnari','sarah','priya'],
+    topic:'Clinical escalation only', unread:0,
+    msgs:[
+      { who:'system',  text:'Restricted channel. Clinical staff only.', ago:'Mon' },
+      { who:'priya',   text:"Camille Olsen's swelling settled without intervention. Nothing further needed.", ago:'Yesterday' },
+      { who:'nunnari', text:"Agreed. Noted on her record.", ago:'Yesterday' },
+    ],
+  },
+];
+
+let selId = 1;
+let dismissedMentions = new Set();
+
+const person = h => (h === ME.handle ? ME : PEOPLE.find(p => p.handle === h)) || { name:h, initials:'?', role:'' };
+const convTitle = c => c.kind === 'channel' ? c.name : person(c.with).name;
+const convInitials = c => c.kind === 'channel'
+  ? c.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+  : person(c.with).initials;
+
+/* A conversation mentions me if any message names me or a list I am on.
+   Derived rather than stored, so it cannot drift out of sync with the text. */
+const MY_LISTS = ['front-desk'];
+function mentionsMe(c){
+  if (dismissedMentions.has(c.id)) return false;
+  return c.msgs.some(m => m.who !== ME.handle && new RegExp('@(' + [ME.handle, ...MY_LISTS].join('|') + ')\\b', 'i').test(m.text || ''));
+}
+
+const ICONS = {
+  hash:'<svg viewBox="0 0 16 16" fill="none"><path d="M6 2.5 4.5 13.5M11 2.5 9.5 13.5M2.8 6h10.4M2.2 10h10.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  at:'<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4"/><path d="M10.2 8v1.4a1.6 1.6 0 0 0 3.1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  lock:'<svg viewBox="0 0 16 16" fill="none"><rect x="3.2" y="7" width="9.6" height="7" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+};
+
+function renderRail(){
+  const dms      = CONVS.filter(c => c.kind === 'dm');
+  const channels = CONVS.filter(c => c.kind === 'channel');
+  const mentions = CONVS.filter(mentionsMe);
+
+  const row = (c, label, ico) => `
+    <button class="ms-item${c.id===selId?' active':''}" onclick="select(${c.id})" data-testid="conv-item" data-conv-id="${c.id}">
+      ${ico}
+      <span class="ms-item-name">${esc(label)}</span>
+      <span class="ms-unread${c.unread?'':' zero'}">${c.unread||''}</span>
+    </button>`;
+
+  let h = '';
+  /* Mentions first: being pulled in is the most time-sensitive thing here. */
+  if (mentions.length){
+    h += `<div class="ms-sec">${ICONS.at}<span>Mentions</span><span class="ms-sec-count">${mentions.length}</span></div>`;
+    h += mentions.map(c => row(c, convTitle(c), `<span class="ms-item-ico">${ICONS.at}</span>`)).join('');
+    h += `<div class="ms-rail-sep"></div>`;
+  }
+  h += `<div class="ms-sec">${ICONS.lock}<span>Direct messages</span><span class="ms-sec-count">${dms.length}</span></div>`;
+  h += dms.map(c => row(c, person(c.with).name, `<span class="ms-item-av">${esc(person(c.with).initials)}</span>`)).join('');
+  h += `<div class="ms-rail-sep"></div>`;
+  h += `<div class="ms-sec">${ICONS.hash}<span>Channels</span><span class="ms-sec-count">${channels.length}</span></div>`;
+  h += channels.map(c => row(c, c.name, `<span class="ms-item-ico">${ICONS.hash}</span>`)).join('');
+  $('rail-body').innerHTML = h;
+
+  const totalUnread = CONVS.reduce((n,c) => n + (c.unread||0), 0);
+  const badge = $('nav-unread');
+  badge.textContent = totalUnread || '';
+  badge.classList.toggle('zero', totalUnread === 0);
+}
+
+const cur = () => CONVS.find(c => c.id === selId) || null;
+
+/* @handles become live tokens. Unknown handles stay plain text so a typo never
+   silently looks like a delivered mention. */
+function renderMentions(text){
+  const known = [...mentionTargets().map(t => t.handle), ME.handle];
+  return esc(text).replace(/@([a-z0-9-]+)/gi, (full, h) => {
+    const hit = known.find(k => k.toLowerCase() === h.toLowerCase());
+    if (!hit) return full;
+    const label = hit === ME.handle ? ME.name
+      : (mentionTargets().find(t => t.handle === hit) || {}).name || hit;
+    return `<span class="ms-mention" data-testid="mention">@${esc(label)}</span>`;
+  });
+}
+
+function select(id){
+  selId = id;
+  const c = cur();
+  if (c) c.unread = 0;      // opening a conversation reads it
+  renderRail(); renderThread();
+}
+
+function renderThread(){
+  const c = cur();
+  if (!c){
+    $('th-title').textContent = 'No conversation selected';
+    $('th-sub').textContent = ''; $('th-av').textContent = '—';
+    $('th-right').innerHTML = '';
+    $('msgs').innerHTML = `<div class="ms-empty">Pick a colleague or a channel.</div>`;
+    $('ctx').innerHTML = '';
+    return;
+  }
+  $('th-av').textContent = convInitials(c);
+  $('th-title').textContent = convTitle(c);
+  $('th-sub').textContent = c.kind === 'channel'
+    ? `${c.members.length} people · ${c.topic}`
+    : person(c.with).role;
+
+  $('th-right').innerHTML = [
+    `<span class="ms-tag">Internal only</span>`,
+    mentionsMe(c) ? `<button class="ms-btn" onclick="dismissMention()" data-testid="dismiss-mention">Dismiss mention</button>` : '',
+  ].join('');
+
+  let lastDay = null;
+  $('msgs').innerHTML = c.msgs.map(m => {
+    if (m.who === 'system'){
+      return `<div class="ms-sys" data-testid="msg-system"><span>${ICONS.lock} ${esc(m.text)} · ${esc(m.ago)}</span></div>`;
+    }
+    const p = person(m.who);
+    const mine = m.who === ME.handle;
+    return `<div class="ms-msg ${mine?'me':''}" data-testid="msg">
+      <span class="ms-msg-av">${esc(p.initials)}</span>
+      <div>
+        <div class="ms-bubble">${renderMentions(m.text)}</div>
+        <div class="ms-msg-foot">${esc(mine?'You':p.name)} · ${esc(m.ago)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  $('msgs').scrollTop = $('msgs').scrollHeight;
+
+  renderCtx(c);
+}
+
+function renderCtx(c){
+  if (c.kind === 'channel'){
+    $('ctx').innerHTML = `
+      <div class="ms-ctx-sec">
+        <div class="ms-ctx-label">Channel</div>
+        <div class="ms-ctx-row"><span class="ms-ctx-k">Name</span><span class="ms-ctx-v">${esc(c.name)}</span></div>
+        <div class="ms-ctx-row"><span class="ms-ctx-k">Purpose</span><span class="ms-ctx-v">${esc(c.topic)}</span></div>
+        <div class="ms-ctx-row"><span class="ms-ctx-k">Visibility</span><span class="ms-ctx-v">Internal only</span></div>
+      </div>
+      <div class="ms-ctx-sec">
+        <div class="ms-ctx-label">Members · ${c.members.length}</div>
+        ${c.members.map(h => { const p = person(h); return `<div class="ms-member"><span class="ms-member-av">${esc(p.initials)}</span>${esc(p.name)}<span class="ms-member-role">${esc(p.short || p.role || '')}</span></div>`; }).join('')}
+      </div>`;
+    return;
+  }
+  const p = person(c.with);
+  $('ctx').innerHTML = `
+    <div class="ms-ctx-sec">
+      <div class="ms-ctx-label">Colleague</div>
+      <div class="ms-ctx-row"><span class="ms-ctx-k">Name</span><span class="ms-ctx-v">${esc(p.name)}</span></div>
+      <div class="ms-ctx-row"><span class="ms-ctx-k">Role</span><span class="ms-ctx-v">${esc(p.role)}</span></div>
+      <div class="ms-ctx-row"><span class="ms-ctx-k">Conversation</span><span class="ms-ctx-v">Direct, internal only</span></div>
+    </div>
+    <div class="ms-ctx-sec">
+      <div class="ms-ctx-label">Shared channels</div>
+      ${CONVS.filter(x => x.kind==='channel' && x.members.includes(p.handle))
+        .map(x => `<div class="ms-member"><span class="ms-member-av">#</span>${esc(x.name)}</div>`).join('') || '<div style="font-size:12px;color:var(--g6)">None</div>'}
+    </div>`;
+}
+
+/* ── Composer ── */
+function onInput(){
+  $('send-btn').disabled = !$('input').value.trim();
+  maybeMention();
+}
+function onKey(e){
+  if (e.key === 'Escape'){ closeMentionPop(); return; }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); send(); }
+}
+function maybeMention(){
+  const el = $('input');
+  const m = el.value.slice(0, el.selectionStart).match(/@([a-z0-9-]*)$/i);
+  if (!m){ closeMentionPop(); return; }
+  const q = m[1].toLowerCase();
+  const hits = mentionTargets().filter(x =>
+    x.handle.toLowerCase().includes(q) || x.name.toLowerCase().includes(q));
+  if (!hits.length){ closeMentionPop(); return; }
+  $('mention-items').innerHTML = hits.map(x =>
+    `<button class="ms-mention-item" onclick="pickMention('${x.handle}')" data-testid="mention-option">
+      <span class="ms-mention-av">${esc(x.initials)}</span>${esc(x.name)}
+      <span class="ms-mention-kind">${esc(x.role)}</span>
+    </button>`).join('');
+  $('mention-pop').classList.add('open');
+}
+function closeMentionPop(){ $('mention-pop').classList.remove('open'); }
+function pickMention(handle){
+  const el = $('input');
+  el.value = el.value.replace(/@([a-z0-9-]*)$/i, '@' + handle + ' ');
+  closeMentionPop(); el.focus(); onInput();
+}
+
+function send(){
+  const c = cur(); if (!c) return;
+  const text = $('input').value.trim(); if (!text) return;
+  c.msgs.push({ who:ME.handle, text, ago:'now' });
+  $('input').value = '';
+  onInput();
+  renderRail(); renderThread();
+  toast('Sent to your team');
+}
+
+function dismissMention(){
+  const c = cur(); if (!c) return;
+  dismissedMentions.add(c.id);
+  renderRail(); renderThread();
+  toast('Mention dismissed');
+}
+
+let toastT = null;
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('visible');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('visible'), 1900);
+}
+
+/* Ecosystem chrome behaviour, identical to the siblings. */
+function openTemplateSettings(){ location.href = 'adoreal_templates.html#/settings'; }
+function showVersion(){
+  const meta = document.querySelector('meta[name="adoreal-prototype-version"]');
+  $('version-toast-num').textContent = 'v' + (meta ? meta.content : '?');
+  $('version-toast').classList.toggle('visible');
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#aos-user-btn') || e.target.closest('#version-toast')) return;
+  $('version-toast').classList.remove('visible');
+  if (!e.target.closest('.ms-composer')) closeMentionPop();
+});
+
+renderRail();
+renderThread();
+
+/* Test seam, mirroring window.__lms on the sibling prototypes. */
+window.__ms = {
+  get convs(){ return CONVS; },
+  get selId(){ return selId; },
+  PEOPLE, LISTS, ME,
+  select, send, dismissMention, mentionsMe, convTitle, person,
+};
+</script>
+</body>
+</html>

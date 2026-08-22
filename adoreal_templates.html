@@ -6,8 +6,8 @@
 <!-- Version is single-source-of-truth here, mirrored into <title> and the
      user-chip toast. The filename stays versionless so sibling prototypes
      can link to it without chasing a v0.N suffix. -->
-<meta name="adoreal-prototype-version" content="0.3">
-<title>adoreal. — Templates · v0.3</title>
+<meta name="adoreal-prototype-version" content="0.4">
+<title>adoreal. — Templates · v0.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Mulish:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -833,7 +833,11 @@ function topbar(){
       <a href="lms.html" data-testid="topnav-patients">Patients</a>
       <span data-testid="topnav-financials">Financials</span>
       <span data-testid="topnav-reports">Reports</span>
-      <a href="index.html" data-testid="topnav-inbox">Inbox</a>
+      <!-- v0.4: was Inbox -> index.html. The ecosystem now has exactly two
+           destinations, Patients and Messaging. The patient inbox belongs to a
+           person and is expanded from their row on the queue, so it is no
+           longer a nav item anywhere. -->
+      <a href="messaging.html" target="_blank" rel="noopener" data-testid="topnav-messaging">Messaging</a>
     </nav>
     <div class="topicons">
       <button title="Tasks"><i class="icon-check-circle"></i></button>
